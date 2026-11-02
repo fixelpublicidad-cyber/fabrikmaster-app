@@ -54,11 +54,12 @@ export default function App() {
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
   
-  // Egresos
+  // Egresos y Filtro de Fechas
   const [descEgreso, setDescEgreso] = useState('');
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
+  const [filtroMes, setFiltroMes] = useState('todos'); // Filtro de mes para finanzas
 
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -218,6 +219,45 @@ export default function App() {
     }
   };
 
+  // 3. DUPLICAR COTIZACIÓN
+  const duplicarCotizacion = (item) => {
+    setEmpresa(item.cliente || '');
+    setRut(item.rut || '');
+    setDireccion(item.direccion || '');
+    setGiro(item.giro || '');
+    setContacto(item.contacto || '');
+    setTelefonoWhatsApp(item.telefono || '');
+    setMaterialSeleccionado(item.material || 'Trovicel 3 mm + Gráfica laminado PVC');
+    setDescripcion(item.descripcion || '');
+    setAncho(String(item.ancho || '120'));
+    setAlto(String(item.alto || '80'));
+    setCantidad(String(item.cantidad || '1'));
+    setCostoMaterialBase(String(item.costo_material || ''));
+    setCostoExtras(String(item.extras || ''));
+    setAbono(String(item.abono || ''));
+    setImagenArchivo(item.imagen_archivo || '');
+    setConFactura(item.con_factura !== false);
+    setVistaActiva('cotizador');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // NUEVO ABONO PARCIAL
+  const registrarAbonoAdicional = async (id, abonoActual, totalTrabajo) => {
+    const nuevoPagoStr = prompt('Ingrese el monto del nuevo abono o pago parcial ($ CLP):');
+    if (!nuevoPagoStr) return;
+    const pagoExtra = parseFloat(nuevoPagoStr) || 0;
+    const nuevoTotalAbonado = Number(abonoActual) + pagoExtra;
+
+    if (nuevoTotalAbonado > totalTrabajo) {
+      alert('El abono total no puede superar el monto total del trabajo.');
+      return;
+    }
+
+    const { error } = await supabase.from('cotizaciones').update({ abono: nuevoTotalAbonado }).eq('id', id);
+    if (!error) cargarDatos();
+  };
+
+  // PDF FORMAL (CLIENTE)
   const generarPDFFormal = (item) => {
     const doc = new jsPDF();
     
@@ -298,6 +338,49 @@ export default function App() {
     doc.save(`Cotizacion_Fixel_${nroStr}.pdf`);
   };
 
+  // 4. PDF OPERATIVO DE TALLER (SIN PRECIOS)
+  const generarPDFOperativo = (item) => {
+    const doc = new jsPDF();
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(249, 115, 22); // Naranja taller
+    doc.text('ORDEN DE TALLER / PRODUCCIÓN', 20, 20);
+
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Trabajo N°: ${nroStr}`, 20, 32);
+    doc.text(`Cliente: ${item.cliente || '---'}`, 20, 40);
+    doc.text(`Fecha de emisión: ${new Date(item.created_at || Date.now()).toLocaleDateString('es-CL')}`, 120, 32);
+    doc.text(`Estado actual: ${item.estado || 'Pendiente'}`, 120, 40);
+
+    doc.setLineWidth(0.5);
+    doc.line(20, 46, 190, 46);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('ESPECIFICACIONES TÉCNICAS', 20, 58);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`• Material / Producto: ${item.material || '---'}`, 20, 68);
+    doc.text(`• Medidas: Ancho ${item.ancho || 0} cm x Alto ${item.alto || 0} cm`, 20, 76);
+    doc.text(`• Cantidad: ${item.cantidad || 1} unidad(es)`, 20, 84);
+    doc.text(`• Descripción / Observaciones: ${item.descripcion || '---'}`, 20, 92);
+
+    if (item.imagen_archivo) {
+      doc.text('• Boceto de Referencia:', 20, 104);
+      try {
+        doc.addImage(item.imagen_archivo, 'JPEG', 20, 110, 80, 60);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    doc.save(`Orden_Taller_${nroStr}.pdf`);
+  };
+
   const enviarWhatsAppFormal = (item) => {
     const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
@@ -345,6 +428,14 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
+  // 1. FILTRAR EGRESOS POR MES / FECHA
+  const egresosFiltrados = listaEgresos.filter(item => {
+    if (filtroMes === 'todos') return true;
+    const fechaItem = new Date(item.created_at);
+    const mesAnio = `${fechaItem.getFullYear()}-${String(fechaItem.getMonth() + 1).padStart(2, '0')}`;
+    return mesAnio === filtroMes;
+  });
+
   // Segmentos de trabajos por estado
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
   const trabajosEnDiseno = cotizaciones.filter(c => c.estado === 'En Diseño');
@@ -355,12 +446,15 @@ export default function App() {
   // Cálculos financieros
   const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
   const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
-  const totalEgresosTaller = listaEgresos.reduce((acc, item) => acc + Number(item.monto || 0), 0);
+  const totalEgresosTaller = egresosFiltrados.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
 
   const renderCardTrabajo = (item) => {
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
     const estadoActual = item.estado || 'Pendiente';
+    const abonoActual = Number(item.abono || 0);
+    const totalTrabajo = Number(item.total || 0);
+    const saldoPendiente = totalTrabajo - abonoActual;
     
     return (
       <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -374,12 +468,33 @@ export default function App() {
         
         {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
         
-        <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1rem' }}>
-          Total: ${Number(item.total).toLocaleString('es-CL')} CLP
+        <div style={{ backgroundColor: '#131c2e', padding: '8px', borderRadius: '6px', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4ade80', fontWeight: 'bold' }}>
+            <span>Total:</span>
+            <span>${totalTrabajo.toLocaleString('es-CL')} CLP</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8', marginTop: '2px' }}>
+            <span>Abonado:</span>
+            <span>${abonoActual.toLocaleString('es-CL')}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: saldoPendiente > 0 ? '#f87171' : '#4ade80', marginTop: '2px' }}>
+            <span>Saldo:</span>
+            <span>${saldoPendiente.toLocaleString('es-CL')}</span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
-          <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
+        {/* 2. BOTÓN DE REGISTRAR ABONO PARCIAL */}
+        <button onClick={() => registrarAbonoAdicional(item.id, abonoActual, totalTrabajo)} style={{ backgroundColor: '#1e293b', color: '#38bdf8', border: '1px solid #334155', padding: '5px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          ➕ Registrar Abono Parcial
+        </button>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: 'auto' }}>
+          <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF Cliente</button>
+          <button onClick={() => generarPDFOperativo(item)} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF Taller</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <button onClick={() => duplicarCotizacion(item)} style={{ flex: 1, backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>Duplicar</button>
           <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
           <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
         </div>
@@ -648,7 +763,7 @@ export default function App() {
                   <input type="number" value={costoExtras} onChange={(e) => setCostoExtras(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Abono ($)</label>
+                  <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Abono Inicial ($)</label>
                   <input type="number" value={abono} onChange={(e) => setAbono(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
               </div>
@@ -807,10 +922,23 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. EGRESOS */}
+        {/* 4. EGRESOS Y FINANZAS */}
         {vistaActiva === 'egresos' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ marginTop: 0, color: '#0284c7', marginBottom: '1.5rem' }}>Registro de Egresos y Gastos del Taller</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, color: '#0284c7' }}>Registro de Egresos y Gastos del Taller</h3>
+              
+              {/* 1. Selector de filtro por mes */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Filtrar Mes:</label>
+                <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)} style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }}>
+                  <option value="todos">Todos los periodos</option>
+                  <option value="2026-11">Noviembre 2026</option>
+                  <option value="2026-12">Diciembre 2026</option>
+                  <option value="2027-01">Enero 2027</option>
+                </select>
+              </div>
+            </div>
             
             <form onSubmit={guardarEgreso} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end', marginBottom: '2rem' }}>
               <div>
@@ -834,8 +962,8 @@ export default function App() {
             </form>
 
             <h4 style={{ color: '#a1a1aa', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>Historial de Egresos</h4>
-            {listaEgresos.length === 0 ? (
-              <p style={{ color: '#a1a1aa', textAlign: 'center' }}>No hay egresos registrados.</p>
+            {egresosFiltrados.length === 0 ? (
+              <p style={{ color: '#a1a1aa', textAlign: 'center' }}>No hay egresos registrados para este periodo.</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
                 <thead>
@@ -848,7 +976,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listaEgresos.map((item) => (
+                  {egresosFiltrados.map((item) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
                       <td style={{ padding: '12px' }}>{new Date(item.created_at).toLocaleDateString('es-CL')}</td>
                       <td style={{ padding: '12px', fontWeight: 'bold' }}>{item.descripcion}</td>
