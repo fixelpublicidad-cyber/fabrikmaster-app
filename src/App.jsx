@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import jsPDF from 'jspdf';
 
 export default function App() {
-  // Pestañas principales del Portal Único Fixel Manager
-  const [vistaActiva, setVistaActiva] = useState('cotizador'); // 'cotizador', 'produccion' o 'egresos'
+  const [vistaActiva, setVistaActiva] = useState('cotizador');
 
-  // Estados del Formulario de Cotización
-  const [cliente, setCliente] = useState('');
+  // Datos formales del cliente (según tu formato)
+  const [empresa, setEmpresa] = useState('');
+  const [rut, setRut] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [giro, setGiro] = useState('');
+  const [contacto, setContacto] = useState('');
+  const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
+
+  // Detalles del producto
   const [descripcion, setDescripcion] = useState('');
   const [ancho, setAncho] = useState('120');
   const [alto, setAlto] = useState('80');
-  const [cantidad, setCantidad] = useState('1');
-  
+  const [cantidad, setCantidad] = useState('5');
   const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
   
   const preciosMateriales = {
@@ -46,13 +52,12 @@ export default function App() {
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
   
-  // Estados de Egresos
+  // Egresos
   const [descEgreso, setDescEgreso] = useState('');
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
 
-  // Filtros y Listas
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [cargando, setCargando] = useState(false);
@@ -79,31 +84,41 @@ export default function App() {
     cargarDatos();
   }, []);
 
-  const calcularSubtotalEnTiempoReal = () => {
+  // Cálculo del valor unitario por m2 y cantidad
+  const calcularValores = () => {
     const a = parseFloat(ancho) || 0;
     const h = parseFloat(alto) || 0;
     const cant = parseInt(cantidad) || 1;
     const m2 = (a / 100) * (h / 100);
     const precioM2 = preciosMateriales[materialSeleccionado] || 0;
-    return Math.round(m2 * precioM2 * cant);
+    
+    // Valor unitario neto por cada elemento
+    const valorUnitario = Math.round(m2 * precioM2);
+    const netoTotal = valorUnitario * cant;
+    const extrasVal = parseFloat(costoExtras) || 0;
+    const netoFinal = netoTotal + extrasVal;
+    const iva = Math.round(netoFinal * 0.19);
+    const totalConIva = netoFinal + iva;
+
+    return { valorUnitario, netoFinal, iva, totalConIva };
   };
 
-  const subtotalActual = calcularSubtotalEnTiempoReal();
+  const { valorUnitario, netoFinal, iva, totalConIva } = calcularValores();
 
-  const agregarALaSolicitud = async (e) => {
+  const guardarCotizacionFormal = async (e) => {
     e.preventDefault();
-    if (!ancho || !alto || !cliente) {
-      alert('Por favor completa al menos el Cliente, Ancho y Alto.');
+    if (!ancho || !alto || !empresa) {
+      alert('Por favor complete al menos la Empresa, Ancho y Alto.');
       return;
     }
 
-    const extrasVal = parseFloat(costoExtras) || 0;
     const abonoVal = parseFloat(abono) || 0;
     const costoInt = parseFloat(costoMaterialBase) || 0;
+    const utilidadDinero = netoFinal - costoInt;
+    const margenPorcentaje = netoFinal > 0 ? Math.round((utilidadDinero / netoFinal) * 100) : 0;
     
-    const precioFinal = subtotalActual + extrasVal;
-    const utilidadDinero = precioFinal - costoInt;
-    const margenPorcentaje = precioFinal > 0 ? Math.round((utilidadDinero / precioFinal) * 100) : 0;
+    // Número de cotización automático basado en timestamp corto o contador
+    const nroCotizacion = cotizaciones.length + 1001;
 
     setCargando(true);
     setMensaje('');
@@ -112,14 +127,23 @@ export default function App() {
       .from('cotizaciones')
       .insert([
         {
-          cliente: cliente,
-          descripcion: `${descripcion || 'Producto a medida'} (Cant: ${cantidad})`,
+          cliente: empresa,
+          rut: rut,
+          direccion: direccion,
+          giro: giro,
+          contacto: contacto,
+          telefono: telefonoWhatsApp,
+          nro_cotizacion: nroCotizacion,
+          descripcion: `${materialSeleccionado} (${ancho}x${alto}cm) - ${descripcion || 'Trabajo de taller'}`,
           ancho: parseFloat(ancho),
           alto: parseFloat(alto),
-          material: materialSeleccionado,
-          extras: extrasVal,
+          cantidad: parseInt(cantidad),
+          valor_unitario: valorUnitario,
+          neto: netoFinal,
+          iva: iva,
+          total: totalConIva,
+          extras: parseFloat(costoExtras) || 0,
           abono: abonoVal,
-          total: precioFinal,
           costo_material: costoInt,
           margen_utilidad: margenPorcentaje,
           estado: 'Pendiente'
@@ -132,14 +156,94 @@ export default function App() {
       console.error('Error al guardar:', error);
       setMensaje('Error al guardar: ' + error.message);
     } else {
-      setMensaje('¡Solicitud guardada en producción con éxito!');
+      setMensaje(`¡Cotización N° ${nroCotizacion} generada con éxito!`);
       cargarDatos();
-      setCliente('');
+      setEmpresa('');
+      setRut('');
+      setDireccion('');
+      setGiro('');
+      setContacto('');
+      setTelefonoWhatsApp('');
       setDescripcion('');
       setCostoMaterialBase('');
       setCostoExtras('');
       setAbono('');
     }
+  };
+
+  // Generar PDF formal idéntico al formato solicitado
+  const generarPDFFormal = (item) => {
+    const doc = new jsPDF();
+    
+    // Encabezado
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('Cotización', 150, 20);
+
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${new Date(item.created_at || Date.now()).toLocaleDateString('es-CL')}`, 135, 30);
+    doc.text(`Cot. N°: ${item.nro_cotizacion || item.id.slice(0, 6)}`, 135, 36);
+
+    // Datos de Empresa / Cliente
+    doc.setFontSize(10);
+    doc.text(`EMPRESA: ${item.cliente || '---'}`, 20, 48);
+    doc.text(`GIRO: ${item.giro || '---'}`, 110, 48);
+    doc.text(`RUT: ${item.rut || '---'}`, 20, 56);
+    doc.text(`CONTACTO: ${item.contacto || item.telefono || '---'}`, 110, 56);
+    doc.text(`DIRECCIÓN: ${item.direccion || '---'}`, 20, 64);
+
+    // Tabla Cabecera
+    doc.setFillColor(0, 0, 0);
+    doc.rect(20, 75, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CANT.', 23, 81);
+    doc.text('DESCRIPCIÓN', 50, 81);
+    doc.text('VALOR U', 135, 81);
+    doc.text('NETO', 165, 81);
+
+    // Fila de Contenido
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(item.cantidad || 1), 25, 92);
+    doc.text(String(item.descripcion || 'Servicio de taller'), 50, 92, { maxWidth: 80 });
+    doc.text(`$${Number(item.valor_unitario || item.total).toLocaleString('es-CL')}`, 135, 92);
+    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 165, 92);
+
+    // Línea divisoria y Totales
+    doc.setLineWidth(0.5);
+    doc.line(20, 120, 190, 120);
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.text('*TODA COTIZACIÓN TIENE UNA VIGENCIA DE 10 DÍAS*', 20, 135);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Subtotal', 130, 135);
+    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 170, 135, { align: 'right' });
+
+    doc.text('IVA 19%', 130, 143);
+    doc.text(`$${Number(item.iva || Math.round(item.total * 0.19)).toLocaleString('es-CL')}`, 170, 143, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total', 130, 151);
+    doc.text(`$${Number(item.total).toLocaleString('es-CL')}`, 170, 151, { align: 'right' });
+
+    // Barra inferior negra
+    doc.setFillColor(0, 0, 0);
+    doc.rect(20, 165, 170, 4, 'F');
+
+    doc.save(`Cotizacion_Fixel_${item.nro_cotizacion || 'formal'}.pdf`);
+  };
+
+  const enviarWhatsAppFormal = (item) => {
+    const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
+    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${item.nro_cotizacion || 'Fixel'}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Neto:* \$${Number(item.neto || item.total).toLocaleString('es-CL')} CLP\n🧾 *IVA (19%):* \$${Number(item.iva || 0).toLocaleString('es-CL')} CLP\n📌 *Total a Pagar:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n\n_Validez de la cotización: 10 días._ ¡Quedamos atentos a sus comentarios!`;
+    const url = telefono 
+      ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
   };
 
   const guardarEgreso = async (e) => {
@@ -198,18 +302,18 @@ export default function App() {
     <div style={{ minHeight: '100vh', backgroundColor: '#0f172a', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* ENCABEZADO Y PORTAL DE NAVEGACIÓN POR PESTAÑAS */}
+        {/* ENCABEZADO Y NAVEGACIÓN */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#1e293b', padding: '1.2rem 1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
           <div>
             <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.5rem' }}>Fixel Manager</h2>
-            <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Portal Integral de Taller y Producción</span>
+            <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Portal Interno de Cotización y Taller</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button 
               onClick={() => setVistaActiva('cotizador')}
               style={{ backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', color: 'white', border: '1px solid #334155', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
             >
-              1. Nueva Solicitud / Cotizar[cite: 8]
+              1. Generar Cotización Formal
             </button>
             <button 
               onClick={() => setVistaActiva('produccion')}
@@ -221,12 +325,12 @@ export default function App() {
               onClick={() => setVistaActiva('egresos')}
               style={{ backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a', color: 'white', border: '1px solid #334155', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
             >
-              3. Control de Egresos ({listaEgresos.length})[cite: 5]
+              3. Control de Egresos ({listaEgresos.length})
             </button>
           </div>
         </div>
 
-        {/* DASHBOARD FINANCIERO GLOBAL */}
+        {/* DASHBOARD FINANCIERO */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
           <div style={{ backgroundColor: '#1e293b', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', textAlign: 'center' }}>
             <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ventas Totales</span>
@@ -246,35 +350,44 @@ export default function App() {
           </div>
         </div>
 
-        {/* CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#18181b', padding: '2.5rem', borderRadius: '12px', border: '1px solid #27272a', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Cotizar</h1>
+            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Generar Cotización Formal</h1>
             <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
-              Arma tu solicitud con tus precios. Se registrará automáticamente en el tablero de taller[cite: 8].
+              Portal interno: Asigna datos de empresa, genera número de orden automático y exporta a PDF para WhatsApp.
             </p>
 
-            <div style={{ backgroundColor: '#0f273d', borderLeft: '4px solid #0284c7', padding: '1rem', borderRadius: '4px', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#38bdf8', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-                SOBRE LOS PRECIOS
-              </div>
-              <div style={{ color: '#d4d4d8', fontSize: '0.9rem' }}>
-                Catálogo sincronizado por metro cuadrado ($/m²). El valor se ajusta con las medidas y cantidad.
-              </div>
-            </div>
-
-            <form onSubmit={agregarALaSolicitud} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              
+              {/* DATOS DE LA EMPRESA / CLIENTE (Formato Oficial) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#09090b', padding: '1.2rem', borderRadius: '8px', border: '1px solid #27272a' }}>
                 <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cliente / Empresa *</label>
-                  <input type="text" value={cliente} onChange={(e) => setCliente(e.target.value)} required placeholder="Nombre del cliente" style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Empresa *</label>
+                  <input type="text" value={empresa} onChange={(e) => setEmpresa(e.target.value)} required placeholder="Nombre de empresa" style={{ width: '100%', padding: '10px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Detalle / Nota del trabajo</label>
-                  <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Letrero corpóreo fachada" style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Giro</label>
+                  <input type="text" value={giro} onChange={(e) => setGiro(e.target.value)} placeholder="Giro comercial" style={{ width: '100%', padding: '10px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>RUT</label>
+                  <input type="text" value={rut} onChange={(e) => setRut(e.target.value)} placeholder="Ej. 76.xxx.xxx-x" style={{ width: '100%', padding: '10px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Contacto</label>
+                  <input type="text" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Nombre del contacto" style={{ width: '100%', padding: '10px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Dirección</label>
+                  <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Dirección fiscal" style={{ width: '100%', padding: '10px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Teléfono WhatsApp</label>
+                  <input type="text" value={telefonoWhatsApp} onChange={(e) => setTelefonoWhatsApp(e.target.value)} placeholder="Ej. 56912345678" style={{ width: '100%', padding: '10px', backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
+              {/* PRODUCTO Y MEDIDAS */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Producto / Material</label>
                 <select 
@@ -290,7 +403,12 @@ export default function App() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Descripción detallada del ítem</label>
+                <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Impresión y laminado en Trovicel" style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Ancho (cm)</label>
                   <input type="number" step="0.01" value={ancho} onChange={(e) => setAncho(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
@@ -299,13 +417,13 @@ export default function App() {
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Alto (cm)</label>
                   <input type="number" step="0.01" value={alto} onChange={(e) => setAlto(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cantidad (Cant.)</label>
+                  <input type="number" min="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cantidad</label>
-                <input type="number" min="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-
+              {/* COSTOS INTERNOS Y FINANZAS */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#f87171', display: 'block', marginBottom: '0.4rem' }}>Costo Producción ($)</label>
@@ -321,10 +439,19 @@ export default function App() {
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Subtotal</label>
-                <div style={{ width: '100%', padding: '14px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: '#38bdf8', fontWeight: 'bold', fontSize: '1.2rem', boxSizing: 'border-box' }}>
-                  ${subtotalActual.toLocaleString('es-CL')} CLP
+              {/* TOTALES FORMALES (Neto, IVA, Total) */}
+              <div style={{ backgroundColor: '#09090b', padding: '1.2rem', borderRadius: '8px', border: '1px solid #27272a', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Neto</span>
+                  <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>${netoFinal.toLocaleString('es-CL')}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>IVA 19%</span>
+                  <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>${iva.toLocaleString('es-CL')}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Total con IVA</span>
+                  <div style={{ fontSize: '1.3rem', color: '#38bdf8', fontWeight: 'bold' }}>${totalConIva.toLocaleString('es-CL')} CLP</div>
                 </div>
               </div>
 
@@ -333,7 +460,7 @@ export default function App() {
                 disabled={cargando}
                 style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', width: 'fit-content' }}
               >
-                {cargando ? 'Guardando...' : 'Agregar a la solicitud'}
+                {cargando ? 'Generando...' : 'Generar y Guardar Cotización Formal'}
               </button>
             </form>
 
@@ -345,7 +472,7 @@ export default function App() {
           <div style={{ backgroundColor: '#18181b', padding: '2rem', borderRadius: '12px', border: '1px solid #27272a', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0, color: '#38bdf8' }}>Tablero y Seguimiento de Taller</h3>
-              <input type="text" placeholder="🔍 Buscar por cliente, material o descripción..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+              <input type="text" placeholder="🔍 Buscar por empresa, RUT o material..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {['TODOS', 'Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'].map((est) => (
@@ -358,7 +485,7 @@ export default function App() {
 
             {cotizaciones.filter(item => {
               const b = busqueda.toLowerCase();
-              const matchB = item.cliente?.toLowerCase().includes(b) || item.material?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
+              const matchB = item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
               const matchE = filtroEstado === 'TODOS' || item.estado === filtroEstado;
               return matchB && matchE;
             }).length === 0 ? (
@@ -368,40 +495,43 @@ export default function App() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #27272a', color: '#a1a1aa' }}>
-                      <th style={{ padding: '10px' }}>Cliente / Detalle</th>
-                      <th style={{ padding: '10px' }}>Medidas / Mat.</th>
-                      <th style={{ padding: '10px' }}>Finanzas (Venta/Costo/Margen)</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>Estado (Flujo Taller)</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>Acciones</th>
+                      <th style={{ padding: '10px' }}>N° Cot. / Empresa</th>
+                      <th style={{ padding: '10px' }}>Detalle</th>
+                      <th style={{ padding: '10px' }}>Total (IVA Incl.)</th>
+                      <th style={{ padding: '10px', textAlign: 'center' }}>Estado Taller</th>
+                      <th style={{ padding: '10px', textAlign: 'center' }}>Acciones PDF / WhatsApp</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cotizaciones.filter(item => {
                       const b = busqueda.toLowerCase();
-                      return (item.cliente?.toLowerCase().includes(b) || item.material?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b)) && (filtroEstado === 'TODOS' || item.estado === filtroEstado);
+                      return (item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b)) && (filtroEstado === 'TODOS' || item.estado === filtroEstado);
                     }).map((item) => {
                       return (
                         <tr key={item.id} style={{ borderBottom: '1px solid #27272a' }}>
                           <td style={{ padding: '12px' }}>
-                            <div style={{ fontWeight: 'bold', color: '#f8fafc' }}>{item.cliente}</div>
-                            <div style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{item.descripcion}</div>
+                            <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {item.nro_cotizacion || item.id.slice(0, 5)}</div>
+                            <div style={{ color: '#f8fafc', fontWeight: 'bold' }}>{item.cliente}</div>
+                            <div style={{ color: '#a1a1aa', fontSize: '0.75rem' }}>RUT: {item.rut || 'S/N'}</div>
                           </td>
                           <td style={{ padding: '12px' }}>
-                            <div>{item.ancho} x {item.alto} cm</div>
-                            <div style={{ color: '#38bdf8', fontSize: '0.8rem' }}>{item.material}</div>
+                            <div style={{ color: '#e4e4e7' }}>{item.descripcion}</div>
+                            <div style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{item.ancho} x {item.alto} cm (Cant: {item.cantidad || 1})</div>
                           </td>
-                          <td style={{ padding: '12px' }}>
-                            <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>Venta: ${Number(item.total).toLocaleString('es-CL')}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#f87171' }}>Costo: -${Number(item.costo_material || 0).toLocaleString('es-CL')}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#4ade80' }}>Margen: {item.margen_utilidad || 0}%</div>
+                          <td style={{ padding: '12px', fontWeight: 'bold', color: '#38bdf8' }}>
+                            ${Number(item.total).toLocaleString('es-CL')} CLP
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <button onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')} title="Haz clic para avanzar de estado en el taller" style={{ backgroundColor: 'transparent', border: `1px solid ${getColorEstado(item.estado)}`, color: getColorEstado(item.estado), padding: '6px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                            <button onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')} title="Avanzar estado" style={{ backgroundColor: 'transparent', border: `1px solid ${getColorEstado(item.estado)}`, color: getColorEstado(item.estado), padding: '6px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                               {item.estado || 'Pendiente'}
                             </button>
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>Eliminar</button>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                              <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
+                              <button onClick={() => enviarWhatsAppFormal(item)} style={{ backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
+                              <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>X</button>
+                            </div>
                           </td>
                         </tr>
                       );
