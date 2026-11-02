@@ -16,7 +16,7 @@ export default function App() {
   const [ancho, setAncho] = useState('120');
   const [alto, setAlto] = useState('80');
   const [cantidad, setCantidad] = useState('1');
-  const [materialSeleccionado, setMaterialSeleccionado] = useState('Panaflex FILM Backligt - Backlite');
+  const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
   
   const preciosMateriales = {
     'Acrílico 3 mm Blanco': 90000,
@@ -112,7 +112,8 @@ export default function App() {
     const utilidadDinero = netoFinal - costoInt;
     const margenPorcentaje = netoFinal > 0 ? Math.round((utilidadDinero / netoFinal) * 100) : 0;
     
-    const nroCotizacion = cotizaciones.length + 1001;
+    // Correlativo automático empezando desde 005 en adelante
+    const nroCotizacion = cotizaciones.length + 5;
 
     setCargando(true);
     setMensaje('');
@@ -128,7 +129,7 @@ export default function App() {
           contacto: contacto,
           telefono: telefonoWhatsApp,
           nro_cotizacion: nroCotizacion,
-          material: materialSeleccionado, // Campo obligatorio incluido
+          material: materialSeleccionado,
           descripcion: `${materialSeleccionado} (${ancho}x${alto}cm) - ${descripcion || 'Trabajo de taller'}`,
           ancho: parseFloat(ancho),
           alto: parseFloat(alto),
@@ -151,7 +152,7 @@ export default function App() {
       console.error('Error al guardar:', error);
       setMensaje('Error al guardar: ' + error.message);
     } else {
-      setMensaje(`¡Cotización N° ${nroCotizacion} generada con éxito!`);
+      setMensaje(`¡Cotización N° ${String(nroCotizacion).padStart(3, '0')} generada con éxito!`);
       cargarDatos();
       setEmpresa('');
       setRut('');
@@ -166,68 +167,98 @@ export default function App() {
     }
   };
 
+  // Generación de PDF formal con el logo institucional (Fondo blanco y subtítulos negros)
   const generarPDFFormal = (item) => {
     const doc = new jsPDF();
     
+    // Cuadro de fondo blanco para el logo superior izquierdo
+    doc.setFillColor(255, 255, 255);
+    doc.rect(20, 15, 75, 22, 'F');
+
+    // Textos del Logo institucional con subtítulos en negro
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(26);
+    doc.setTextColor(0, 140, 255); // Azul Fixel
+    doc.text('FIXEL', 22, 30);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(50, 180, 255);
+    doc.text('EL', 105, 30); // Ajuste visual de marca
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(0, 0, 0); // Letras de abajo en NEGRO
+    doc.text('• NEON LED  •  LETREROS EN ACRÍLICO •', 22, 36);
+
+    // Título Cotización y Fecha (Derecha)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.text('Cotización', 150, 20);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Cotización', 145, 20);
 
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text(`Fecha: ${new Date(item.created_at || Date.now()).toLocaleDateString('es-CL')}`, 135, 30);
-    doc.text(`Cot. N°: ${item.nro_cotizacion || item.id.slice(0, 6)}`, 135, 36);
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    doc.text(`Cot. N°: ${nroStr}`, 135, 36);
 
+    // Datos del Cliente / Empresa
     doc.setFontSize(10);
-    doc.text(`EMPRESA: ${item.cliente || '---'}`, 20, 48);
-    doc.text(`GIRO: ${item.giro || '---'}`, 110, 48);
-    doc.text(`RUT: ${item.rut || '---'}`, 20, 56);
-    doc.text(`CONTACTO: ${item.contacto || item.telefono || '---'}`, 110, 56);
-    doc.text(`DIRECCIÓN: ${item.direccion || '---'}`, 20, 64);
+    doc.text(`EMPRESA: ${item.cliente || '---'}`, 20, 50);
+    doc.text(`GIRO: ${item.giro || '---'}`, 110, 50);
+    doc.text(`RUT: ${item.rut || '---'}`, 20, 58);
+    doc.text(`CONTACTO: ${item.contacto || item.telefono || '---'}`, 110, 58);
+    doc.text(`DIRECCIÓN: ${item.direccion || '---'}`, 20, 66);
 
+    // Tabla Cabecera Negra
     doc.setFillColor(0, 0, 0);
-    doc.rect(20, 75, 170, 8, 'F');
+    doc.rect(20, 76, 170, 8, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('CANT.', 23, 81);
-    doc.text('DESCRIPCIÓN', 50, 81);
-    doc.text('VALOR U', 135, 81);
-    doc.text('NETO', 165, 81);
+    doc.text('CANT.', 23, 82);
+    doc.text('DESCRIPCIÓN', 50, 82);
+    doc.text('VALOR U', 135, 82);
+    doc.text('NETO', 165, 82);
 
+    // Fila de Contenido
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
-    doc.text(String(item.cantidad || 1), 25, 92);
-    doc.text(String(item.descripcion || 'Servicio de taller'), 50, 92, { maxWidth: 80 });
-    doc.text(`$${Number(item.valor_unitario || item.total).toLocaleString('es-CL')}`, 135, 92);
-    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 165, 92);
+    doc.text(String(item.cantidad || 1), 25, 94);
+    doc.text(String(item.descripcion || 'Servicio de taller'), 50, 94, { maxWidth: 75 });
+    doc.text(`$${Number(item.valor_unitario || item.total).toLocaleString('es-CL')}`, 135, 94);
+    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 165, 94);
 
+    // Línea divisoria y Totales
     doc.setLineWidth(0.5);
-    doc.line(20, 120, 190, 120);
+    doc.line(20, 125, 190, 125);
 
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
-    doc.text('*TODA COTIZACIÓN TIENE UNA VIGENCIA DE 10 DÍAS*', 20, 135);
+    doc.text('*TODA COTIZACIÓN TIENE UNA VIGENCIA DE 10 DÍAS*', 20, 138);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text('Subtotal', 130, 135);
-    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 170, 135, { align: 'right' });
+    doc.text('Subtotal', 130, 138);
+    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 170, 138, { align: 'right' });
 
-    doc.text('IVA 19%', 130, 143);
-    doc.text(`$${Number(item.iva || Math.round(item.total * 0.19)).toLocaleString('es-CL')}`, 170, 143, { align: 'right' });
+    doc.text('IVA 19%', 130, 146);
+    doc.text(`$${Number(item.iva || Math.round(item.total * 0.19)).toLocaleString('es-CL')}`, 170, 146, { align: 'right' });
 
     doc.setFont('helvetica', 'bold');
-    doc.text('Total', 130, 151);
-    doc.text(`$${Number(item.total).toLocaleString('es-CL')}`, 170, 151, { align: 'right' });
+    doc.text('Total', 130, 154);
+    doc.text(`$${Number(item.total).toLocaleString('es-CL')}`, 170, 154, { align: 'right' });
 
+    // Barra inferior negra
     doc.setFillColor(0, 0, 0);
-    doc.rect(20, 165, 170, 4, 'F');
+    doc.rect(20, 170, 170, 4, 'F');
 
-    doc.save(`Cotizacion_Fixel_${item.nro_cotizacion || 'formal'}.pdf`);
+    doc.save(`Cotizacion_Fixel_${nroStr}.pdf`);
   };
 
   const enviarWhatsAppFormal = (item) => {
     const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
-    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${item.nro_cotizacion || 'Fixel'}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Neto:* \$${Number(item.neto || item.total).toLocaleString('es-CL')} CLP\n🧾 *IVA (19%):* \$${Number(item.iva || 0).toLocaleString('es-CL')} CLP\n📌 *Total a Pagar:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n\n_Validez de la cotización: 10 días._ ¡Quedamos atentos a sus comentarios!`;
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Neto:* \$${Number(item.neto || item.total).toLocaleString('es-CL')} CLP\n🧾 *IVA (19%):* \$${Number(item.iva || 0).toLocaleString('es-CL')} CLP\n📌 *Total a Pagar:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n\n_Validez de la cotización: 10 días._ ¡Quedamos atentos a sus comentarios!`;
     const url = telefono 
       ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}`
       : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
@@ -342,7 +373,7 @@ export default function App() {
           <div style={{ backgroundColor: '#18181b', padding: '2.5rem', borderRadius: '12px', border: '1px solid #27272a', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Generar Cotización Formal</h1>
             <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
-              Portal interno: Asigna datos de empresa, genera número de orden automático y exporta a PDF para WhatsApp.
+              Portal interno: Asigna datos de empresa, genera número correlativo desde 005 y exporta a PDF para WhatsApp.
             </p>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -491,10 +522,11 @@ export default function App() {
                       const b = busqueda.toLowerCase();
                       return (item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b)) && (filtroEstado === 'TODOS' || item.estado === filtroEstado);
                     }).map((item) => {
+                      const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
                       return (
                         <tr key={item.id} style={{ borderBottom: '1px solid #27272a' }}>
                           <td style={{ padding: '12px' }}>
-                            <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {item.nro_cotizacion || item.id.slice(0, 5)}</div>
+                            <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</div>
                             <div style={{ color: '#f8fafc', fontWeight: 'bold' }}>{item.cliente}</div>
                             <div style={{ color: '#a1a1aa', fontSize: '0.75rem' }}>RUT: {item.rut || 'S/N'}</div>
                           </td>
