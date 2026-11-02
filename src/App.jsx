@@ -19,7 +19,7 @@ export default function App() {
   const [alto, setAlto] = useState('80');
   const [cantidad, setCantidad] = useState('1');
   const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
-  const [imagenArchivo, setImagenArchivo] = useState(''); // Pre-captura en formato base64 o URL
+  const [imagenArchivo, setImagenArchivo] = useState('');
 
   const preciosMateriales = {
     'Acrílico 3 mm Blanco': 90000,
@@ -85,7 +85,6 @@ export default function App() {
     cargarDatos();
   }, []);
 
-  // Carga de pre-captura local mediante FileReader
   const handleImagenChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -302,9 +301,7 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
-  // Contadores de trabajos
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
-  const enCursoTrabajos = cotizaciones.filter(c => c.estado !== 'Entregado' && c.estado !== 'Pendiente');
 
   const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
   const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
@@ -324,48 +321,52 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
-      <div style={{ maxWidth: '1150px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* ENCABEZADO Y PORTAL EN CUADROS DE CORTE PROFESIONAL */}
+        {/* ENCABEZADO Y CUADROS DE NAVEGACIÓN EN UNA SOLA LÍNEA HORIZONTAL */}
         <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)' }}>
           <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
             <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
             <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal Interno de Control, Cotización y Operación de Taller</span>
           </div>
 
-          {/* TARJETAS / CUADROS DE NAVEGACIÓN PRINCIPALES */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          {/* CONTENEDOR FLEX PARA MANTENER LAS 4 TARJETAS SIEMPRE LADO A LADO */}
+          <div style={{ display: 'flex', gap: '1rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
             
             <div 
               onClick={() => setVistaActiva('cotizador')}
               style={{
+                flex: '1 1 0px',
+                minWidth: '200px',
                 backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`,
-                padding: '1.2rem',
+                padding: '1rem',
                 borderRadius: '12px',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              <div style={{ fontSize: '0.8rem', color: vistaActiva === 'cotizador' ? '#e0f2fe' : '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>1. Generar Cotización</div>
+              <div style={{ fontSize: '0.75rem', color: vistaActiva === 'cotizador' ? '#e0f2fe' : '#94a3b8', fontWeight: 'bold', letterSpacing: '0.05em' }}>NUEVA</div>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>1. Cotización</div>
             </div>
 
             <div 
               onClick={() => setVistaActiva('pendientes')}
               style={{
+                flex: '1 1 0px',
+                minWidth: '200px',
                 backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`,
-                padding: '1.2rem',
+                padding: '1rem',
                 borderRadius: '12px',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>POR APROBAR</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 'bold', letterSpacing: '0.05em' }}>POR APROBAR</div>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
                 2. Pendientes ({pendientesTrabajos.length})
               </div>
             </div>
@@ -373,17 +374,19 @@ export default function App() {
             <div 
               onClick={() => setVistaActiva('produccion')}
               style={{
+                flex: '1 1 0px',
+                minWidth: '200px',
                 backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`,
-                padding: '1.2rem',
+                padding: '1rem',
                 borderRadius: '12px',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              <div style={{ fontSize: '0.8rem', color: '#4ade80', fontWeight: 'bold' }}>TALLER / KANBAN</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 'bold', letterSpacing: '0.05em' }}>TALLER / KANBAN</div>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
                 3. Tablero ({cotizaciones.length})
               </div>
             </div>
@@ -391,17 +394,19 @@ export default function App() {
             <div 
               onClick={() => setVistaActiva('egresos')}
               style={{
+                flex: '1 1 0px',
+                minWidth: '200px',
                 backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`,
-                padding: '1.2rem',
+                padding: '1rem',
                 borderRadius: '12px',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              <div style={{ fontSize: '0.8rem', color: '#f87171', fontWeight: 'bold' }}>FINANZAS</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#f87171', fontWeight: 'bold', letterSpacing: '0.05em' }}>FINANZAS</div>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
                 4. Egresos ({listaEgresos.length})
               </div>
             </div>
@@ -486,7 +491,6 @@ export default function App() {
                 <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Impresión y laminado en Trovicel" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               </div>
 
-              {/* ARCHIVO / PRE-CAPTURA DEL TRABAJO */}
               <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px dashed #38bdf8' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#38bdf8', display: 'block', marginBottom: '0.4rem' }}>📸 Pre-captura del trabajo / Boceto de diseño (Opcional)</label>
                 <input type="file" accept="image/*" onChange={handleImagenChange} style={{ color: '#a1a1aa', fontSize: '0.85rem' }} />
@@ -601,7 +605,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TABLERO GENERAL DE PRODUCCIÓN (Con pre-capturas visuales) */}
+        {/* 3. TABLERO GENERAL DE PRODUCCIÓN */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
