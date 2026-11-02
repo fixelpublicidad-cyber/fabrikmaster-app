@@ -84,12 +84,24 @@ export default function App() {
     cargarDatos();
   }, []);
 
-  const handleImagenChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+  const procesarArchivo = (file) => {
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => setImagenArchivo(reader.result);
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImagenChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      procesarArchivo(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      procesarArchivo(e.dataTransfer.files[0]);
     }
   };
 
@@ -322,7 +334,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* ENCABEZADO Y CUADROS DE NAVEGACIÓN SIEMPRE EN UNA LÍNEA */}
+        {/* ENCABEZADO Y CUADROS DE NAVEGACIÓN EN UNA SOLA LÍNEA */}
         <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)' }}>
           <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
             <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
@@ -437,7 +449,7 @@ export default function App() {
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización Formal</h1>
             <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
-              Genera una orden interna, añade una pre-captura del diseño o boceto y exporta a PDF formal.
+              Genera una orden interna, adjunta una pre-captura del diseño o boceto y exporta a PDF formal.
             </p>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -489,15 +501,43 @@ export default function App() {
                 <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Impresión y laminado en Trovicel" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               </div>
 
-              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px dashed #38bdf8' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#38bdf8', display: 'block', marginBottom: '0.4rem' }}>📸 Pre-captura del trabajo / Boceto de diseño (Opcional)</label>
-                <input type="file" accept="image/*" onChange={handleImagenChange} style={{ color: '#a1a1aa', fontSize: '0.85rem' }} />
-                {imagenArchivo && (
-                  <div style={{ marginTop: '0.8rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <img src={imagenArchivo} alt="Pre-captura" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #38bdf8' }} />
-                    <span style={{ color: '#4ade80', fontSize: '0.8rem', fontWeight: 'bold' }}>✓ Precaptura cargada correctamente</span>
-                  </div>
-                )}
+              {/* ZONA DE ARRASTRE Y CARGA DE IMÁGENES */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imágenes de referencia (opcional)</label>
+                <div 
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  style={{
+                    backgroundColor: '#090d16',
+                    border: '2px dashed #334155',
+                    borderRadius: '12px',
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.8rem'
+                  }}
+                >
+                  <div style={{ fontSize: '2rem' }}>🖼️</div>
+                  <div style={{ fontSize: '0.95rem', color: '#e2e8f0' }}>Arrastra imágenes o pega con Ctrl+V</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>También con los botones de abajo. Pre-captura o boceto de diseño.</div>
+                  
+                  {imagenArchivo && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#131c2e', padding: '8px 12px', borderRadius: '8px', border: '1px solid #38bdf8' }}>
+                      <img src={imagenArchivo} alt="Pre-captura" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
+                      <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 'bold' }}>✓ Imagen cargada correctamente</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <label style={{ backgroundColor: '#1e293b', color: 'white', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', border: '1px solid #334155', display: 'inline-block' }}>
+                    Elegir archivos
+                    <input type="file" accept="image/*" onChange={handleImagenChange} style={{ display: 'none' }} />
+                  </label>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
@@ -603,7 +643,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TABLERO GENERAL DE PRODUCCIÓN (Muestra todos los estados: Pendiente, Diseño, Producción, Listo, Entregado) */}
+        {/* 3. TABLERO GENERAL DE PRODUCCIÓN */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
