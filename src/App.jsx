@@ -3,26 +3,22 @@ import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 
 export default function App() {
-  // Pestañas de navegación interna
-  const [vistaActiva, setVistaActiva] = useState('cotizador'); // 'cotizador' o 'egresos'
+  const [vistaActiva, setVistaActiva] = useState('cotizador');
 
-  // Estados del Formulario de Cotización
   const [cliente, setCliente] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [ancho, setAncho] = useState('');
   const [alto, setAlto] = useState('');
   const [material, setMaterial] = useState('Acrílico');
-  const [costoMaterialBase, setCostoMaterialBase] = useState(''); // Costo interno de producción por m2 o total
+  const [costoMaterialBase, setCostoMaterialBase] = useState('');
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
   
-  // Estados de Egresos
   const [descEgreso, setDescEgreso] = useState('');
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
 
-  // Filtros y Listas
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [total, setTotal] = useState(null);
@@ -38,7 +34,6 @@ export default function App() {
   };
 
   const cargarDatos = async () => {
-    // Cargar Cotizaciones
     const { data: dataCot, error: errCot } = await supabase
       .from('cotizaciones')
       .select('*')
@@ -46,7 +41,6 @@ export default function App() {
 
     if (!errCot && dataCot) setCotizaciones(dataCot);
 
-    // Cargar Egresos
     const { data: dataEgr, error: errEgr } = await supabase
       .from('egresos')
       .select('*')
@@ -73,7 +67,6 @@ export default function App() {
     const calculoMaterial = numAncho * numAlto * precioBase;
     const precioFinal = Math.round(calculoMaterial + extrasVal);
 
-    // Calcular margen de utilidad en porcentaje
     const utilidadDinero = precioFinal - costoInt;
     const margenPorcentaje = precioFinal > 0 ? Math.round((utilidadDinero / precioFinal) * 100) : 0;
 
@@ -140,9 +133,11 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
+  // Nuevo flujo de estados solicitado
   const cambiarEstado = async (id, estadoActual) => {
-    const estadosPosibles = ['Pendiente', 'Aprobado', 'En Taller', 'Entregado'];
-    const siguienteEstado = estadosPosibles[(estadosPosibles.indexOf(estadoActual) + 1) % estadosPosibles.length];
+    const estadosPosibles = ['Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'];
+    const indiceActual = estadosPosibles.indexOf(estadoActual);
+    const siguienteEstado = estadosPosibles[(indiceActual !== -1 ? indiceActual + 1 : 0) % estadosPosibles.length];
 
     const { error } = await supabase.from('cotizaciones').update({ estado: siguienteEstado }).eq('id', id);
     if (!error) cargarDatos();
@@ -153,17 +148,18 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
-  // Cálculos Financieros Globales
   const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
   const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
   const totalEgresosTaller = listaEgresos.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
-  const saldoPendienteCobro = cotizaciones.filter(i => i.estado !== 'Entregado').reduce((acc, item) => acc + (Number(item.total || 0) - Number(item.abono || 0)), 0);
 
+  // Colores para cada estado del nuevo flujo
   const getColorEstado = (estado) => {
     switch (estado) {
-      case 'Aprobado': return '#38bdf8';
-      case 'En Taller': return '#f59e0b';
+      case 'Pendiente': return '#94a3b8';
+      case 'En Diseño': return '#38bdf8';
+      case 'En Corte/Producción': return '#f59e0b';
+      case 'Listo': return '#a855f7';
       case 'Entregado': return '#4ade80';
       default: return '#94a3b8';
     }
@@ -214,7 +210,7 @@ export default function App() {
 
         {vistaActiva === 'cotizador' ? (
           <>
-            {/* FORMULARIO DE COTIZACIÓN Y COSTOS */}
+            {/* FORMULARIO */}
             <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
               <h3 style={{ marginTop: 0, color: '#38bdf8', marginBottom: '1.5rem' }}>Nueva Cotización y Costo de Producción</h3>
               
@@ -282,14 +278,15 @@ export default function App() {
               {mensaje && <p style={{ marginTop: '1rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem', color: mensaje.includes('éxito') ? '#4ade80' : '#f87171' }}>{mensaje}</p>}
             </div>
 
-            {/* TABLERO DE PRODUCCIÓN */}
+            {/* TABLERO DE PRODUCCIÓN CON NUEVOS ESTADOS */}
             <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: 0, color: '#38bdf8' }}>Historial y Tablero de Producción</h3>
                 <input type="text" placeholder="🔍 Buscar por cliente, material o descripción..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 
+                {/* Filtros rápidos actualizados con el nuevo flujo */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {['TODOS', 'Pendiente', 'Aprobado', 'En Taller', 'Entregado'].map((est) => (
+                  {['TODOS', 'Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'].map((est) => (
                     <button key={est} onClick={() => setFiltroEstado(est)} style={{ backgroundColor: filtroEstado === est ? '#0284c7' : '#0f172a', color: filtroEstado === est ? 'white' : '#94a3b8', border: '1px solid #334155', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
                       {est}
                     </button>
@@ -312,7 +309,7 @@ export default function App() {
                         <th style={{ padding: '8px' }}>Cliente / Detalle</th>
                         <th style={{ padding: '8px' }}>Medidas / Mat.</th>
                         <th style={{ padding: '8px' }}>Finanzas (Venta/Costo/Margen)</th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>Estado</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>Estado (Flujo Taller)</th>
                         <th style={{ padding: '8px', textAlign: 'center' }}>Acciones</th>
                       </tr>
                     </thead>
@@ -321,7 +318,6 @@ export default function App() {
                         const b = busqueda.toLowerCase();
                         return (item.cliente?.toLowerCase().includes(b) || item.material?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b)) && (filtroEstado === 'TODOS' || item.estado === filtroEstado);
                       }).map((item) => {
-                        const saldo = Number(item.total || 0) - Number(item.abono || 0);
                         return (
                           <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
                             <td style={{ padding: '10px' }}>
@@ -338,7 +334,7 @@ export default function App() {
                               <div style={{ fontSize: '0.75rem', color: '#4ade80' }}>Margen: {item.margen_utilidad || 0}%</div>
                             </td>
                             <td style={{ padding: '10px', textAlign: 'center' }}>
-                              <button onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')} style={{ backgroundColor: 'transparent', border: `1px solid ${getColorEstado(item.estado)}`, color: getColorEstado(item.estado), padding: '4px 8px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                              <button onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')} title="Haz clic para avanzar de estado" style={{ backgroundColor: 'transparent', border: `1px solid ${getColorEstado(item.estado)}`, color: getColorEstado(item.estado), padding: '4px 8px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                                 {item.estado || 'Pendiente'}
                               </button>
                             </td>
@@ -355,7 +351,7 @@ export default function App() {
             </div>
           </>
         ) : (
-          /* MÓDULO DE EGRESOS DEL TALLER */
+          /* MÓDULO DE EGRESOS */
           <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
             <h3 style={{ marginTop: 0, color: '#38bdf8', marginBottom: '1.5rem' }}>Registro de Egresos y Gastos del Taller</h3>
             
