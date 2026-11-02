@@ -5,7 +5,6 @@ import jsPDF from 'jspdf';
 export default function App() {
   const [vistaActiva, setVistaActiva] = useState('cotizador');
 
-  // Datos formales del cliente (según tu formato)
   const [empresa, setEmpresa] = useState('');
   const [rut, setRut] = useState('');
   const [direccion, setDireccion] = useState('');
@@ -13,12 +12,11 @@ export default function App() {
   const [contacto, setContacto] = useState('');
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
 
-  // Detalles del producto
   const [descripcion, setDescripcion] = useState('');
   const [ancho, setAncho] = useState('120');
   const [alto, setAlto] = useState('80');
-  const [cantidad, setCantidad] = useState('5');
-  const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
+  const [cantidad, setCantidad] = useState('1');
+  const [materialSeleccionado, setMaterialSeleccionado] = useState('Panaflex FILM Backligt - Backlite');
   
   const preciosMateriales = {
     'Acrílico 3 mm Blanco': 90000,
@@ -52,7 +50,6 @@ export default function App() {
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
   
-  // Egresos
   const [descEgreso, setDescEgreso] = useState('');
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
@@ -84,7 +81,6 @@ export default function App() {
     cargarDatos();
   }, []);
 
-  // Cálculo del valor unitario por m2 y cantidad
   const calcularValores = () => {
     const a = parseFloat(ancho) || 0;
     const h = parseFloat(alto) || 0;
@@ -92,7 +88,6 @@ export default function App() {
     const m2 = (a / 100) * (h / 100);
     const precioM2 = preciosMateriales[materialSeleccionado] || 0;
     
-    // Valor unitario neto por cada elemento
     const valorUnitario = Math.round(m2 * precioM2);
     const netoTotal = valorUnitario * cant;
     const extrasVal = parseFloat(costoExtras) || 0;
@@ -117,7 +112,6 @@ export default function App() {
     const utilidadDinero = netoFinal - costoInt;
     const margenPorcentaje = netoFinal > 0 ? Math.round((utilidadDinero / netoFinal) * 100) : 0;
     
-    // Número de cotización automático basado en timestamp corto o contador
     const nroCotizacion = cotizaciones.length + 1001;
 
     setCargando(true);
@@ -134,6 +128,7 @@ export default function App() {
           contacto: contacto,
           telefono: telefonoWhatsApp,
           nro_cotizacion: nroCotizacion,
+          material: materialSeleccionado, // Campo obligatorio incluido
           descripcion: `${materialSeleccionado} (${ancho}x${alto}cm) - ${descripcion || 'Trabajo de taller'}`,
           ancho: parseFloat(ancho),
           alto: parseFloat(alto),
@@ -171,11 +166,9 @@ export default function App() {
     }
   };
 
-  // Generar PDF formal idéntico al formato solicitado
   const generarPDFFormal = (item) => {
     const doc = new jsPDF();
     
-    // Encabezado
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.text('Cotización', 150, 20);
@@ -184,7 +177,6 @@ export default function App() {
     doc.text(`Fecha: ${new Date(item.created_at || Date.now()).toLocaleDateString('es-CL')}`, 135, 30);
     doc.text(`Cot. N°: ${item.nro_cotizacion || item.id.slice(0, 6)}`, 135, 36);
 
-    // Datos de Empresa / Cliente
     doc.setFontSize(10);
     doc.text(`EMPRESA: ${item.cliente || '---'}`, 20, 48);
     doc.text(`GIRO: ${item.giro || '---'}`, 110, 48);
@@ -192,7 +184,6 @@ export default function App() {
     doc.text(`CONTACTO: ${item.contacto || item.telefono || '---'}`, 110, 56);
     doc.text(`DIRECCIÓN: ${item.direccion || '---'}`, 20, 64);
 
-    // Tabla Cabecera
     doc.setFillColor(0, 0, 0);
     doc.rect(20, 75, 170, 8, 'F');
     doc.setTextColor(255, 255, 255);
@@ -202,7 +193,6 @@ export default function App() {
     doc.text('VALOR U', 135, 81);
     doc.text('NETO', 165, 81);
 
-    // Fila de Contenido
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
     doc.text(String(item.cantidad || 1), 25, 92);
@@ -210,7 +200,6 @@ export default function App() {
     doc.text(`$${Number(item.valor_unitario || item.total).toLocaleString('es-CL')}`, 135, 92);
     doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 165, 92);
 
-    // Línea divisoria y Totales
     doc.setLineWidth(0.5);
     doc.line(20, 120, 190, 120);
 
@@ -230,7 +219,6 @@ export default function App() {
     doc.text('Total', 130, 151);
     doc.text(`$${Number(item.total).toLocaleString('es-CL')}`, 170, 151, { align: 'right' });
 
-    // Barra inferior negra
     doc.setFillColor(0, 0, 0);
     doc.rect(20, 165, 170, 4, 'F');
 
@@ -359,7 +347,6 @@ export default function App() {
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               
-              {/* DATOS DE LA EMPRESA / CLIENTE (Formato Oficial) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#09090b', padding: '1.2rem', borderRadius: '8px', border: '1px solid #27272a' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Empresa *</label>
@@ -387,7 +374,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* PRODUCTO Y MEDIDAS */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Producto / Material</label>
                 <select 
@@ -423,7 +409,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* COSTOS INTERNOS Y FINANZAS */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#f87171', display: 'block', marginBottom: '0.4rem' }}>Costo Producción ($)</label>
@@ -439,7 +424,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* TOTALES FORMALES (Neto, IVA, Total) */}
               <div style={{ backgroundColor: '#09090b', padding: '1.2rem', borderRadius: '8px', border: '1px solid #27272a', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '1rem' }}>
                 <div style={{ textAlign: 'center' }}>
                   <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Neto</span>
