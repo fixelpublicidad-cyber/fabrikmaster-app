@@ -12,6 +12,7 @@ export default function App() {
   const [giro, setGiro] = useState('');
   const [contacto, setContacto] = useState('');
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
+  const [conFactura, setConFactura] = useState(true); // Opciones: con factura/boleta o sin factura
 
   // Detalles del trabajo
   const [descripcion, setDescripcion] = useState('');
@@ -116,7 +117,9 @@ export default function App() {
     const netoTotal = valorUnitario * cant;
     const extrasVal = parseFloat(costoExtras) || 0;
     const netoFinal = netoTotal + extrasVal;
-    const iva = Math.round(netoFinal * 0.19);
+    
+    // Si no requiere factura, el IVA no se suma al cobro final para cuadrar cuentas directas de taller
+    const iva = conFactura ? Math.round(netoFinal * 0.19) : 0;
     const totalConIva = netoFinal + iva;
 
     return { valorUnitario, netoFinal, iva, totalConIva };
@@ -165,6 +168,7 @@ export default function App() {
           costo_material: costoInt,
           margen_utilidad: margenPorcentaje,
           imagen_archivo: imagenArchivo,
+          con_factura: conFactura,
           estado: 'Pendiente'
         },
       ]);
@@ -188,6 +192,7 @@ export default function App() {
       setCostoExtras('');
       setAbono('');
       setImagenArchivo('');
+      setConFactura(true);
     }
   };
 
@@ -253,8 +258,13 @@ export default function App() {
     doc.text('Subtotal', 130, 138);
     doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 170, 138, { align: 'right' });
 
-    doc.text('IVA 19%', 130, 146);
-    doc.text(`$${Number(item.iva || Math.round(item.total * 0.19)).toLocaleString('es-CL')}`, 170, 146, { align: 'right' });
+    if (item.con_factura !== false) {
+      doc.text('IVA 19%', 130, 146);
+      doc.text(`$${Number(item.iva || Math.round(item.total * 0.19)).toLocaleString('es-CL')}`, 170, 146, { align: 'right' });
+    } else {
+      doc.text('Sin Factura (Neto Final)', 110, 146);
+      doc.text('$0', 170, 146, { align: 'right' });
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.text('Total', 130, 154);
@@ -269,7 +279,8 @@ export default function App() {
   const enviarWhatsAppFormal = (item) => {
     const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Neto:* \$${Number(item.neto || item.total).toLocaleString('es-CL')} CLP\n🧾 *IVA (19%):* \$${Number(item.iva || 0).toLocaleString('es-CL')} CLP\n📌 *Total a Pagar:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n\n_Validez de la cotización: 10 días._ ¡Quedamos atentos a sus comentarios!`;
+    const facturaTxt = item.con_factura !== false ? '🧾 *IVA (19% incluido)*' : '📌 *Sin Factura (Venta Directa)*';
+    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto Total:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n${facturaTxt}\n\n_Validez de la cotización: 10 días._ ¡Quedamos atentos a sus comentarios!`;
     const url = telefono 
       ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}`
       : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
@@ -321,9 +332,9 @@ export default function App() {
 
   const getColorEstado = (estado) => {
     switch (estado) {
-      case 'Pendiente': return '#94a3b8';
+      case 'Pendiente': return '#f59e0b';
       case 'En Diseño': return '#38bdf8';
-      case 'En Corte/Producción': return '#f59e0b';
+      case 'En Corte/Producción': return '#f97316';
       case 'Listo': return '#a855f7';
       case 'Entregado': return '#4ade80';
       default: return '#94a3b8';
@@ -449,7 +460,7 @@ export default function App() {
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización Formal</h1>
             <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
-              Genera una orden interna, adjunta una pre-captura del diseño o boceto y exporta a PDF formal.
+              Genera una orden interna, define si requiere factura o es venta sin factura, y exporta el PDF.
             </p>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -478,6 +489,30 @@ export default function App() {
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Teléfono WhatsApp</label>
                   <input type="text" value={telefonoWhatsApp} onChange={(e) => setTelefonoWhatsApp(e.target.value)} placeholder="Ej. 56912345678" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+
+              {/* TIPO DE VENTA / FACTURACIÓN */}
+              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#38bdf8', display: 'block' }}>📄 Régimen Fiscal / Facturación</label>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Selecciona si el trabajo requiere IVA o es una venta directa sin factura para cuadrar cuentas.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setConFactura(true)}
+                    style={{ backgroundColor: conFactura ? '#0284c7' : '#1e293b', color: 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
+                  >
+                    Con Factura / Boleta (+19% IVA)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setConFactura(false)}
+                    style={{ backgroundColor: !conFactura ? '#f59e0b' : '#1e293b', color: !conFactura ? '#090d16' : 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
+                  >
+                    Sin Factura (Venta Directa)
+                  </button>
                 </div>
               </div>
 
@@ -576,11 +611,11 @@ export default function App() {
                   <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>${netoFinal.toLocaleString('es-CL')}</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>IVA 19%</span>
-                  <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>${iva.toLocaleString('es-CL')}</div>
+                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{conFactura ? 'IVA 19%' : 'Sin Factura'}</span>
+                  <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>{conFactura ? `$${iva.toLocaleString('es-CL')}` : '$0'}</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Total con IVA</span>
+                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Total a Pagar</span>
                   <div style={{ fontSize: '1.3rem', color: '#38bdf8', fontWeight: 'bold' }}>${totalConIva.toLocaleString('es-CL')} CLP</div>
                 </div>
               </div>
@@ -598,10 +633,10 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. PESTAÑA DEDICADA DE TRABAJOS PENDIENTES */}
+        {/* 2. PESTAÑA DEDICADA DE TRABAJOS PENDIENTES (En Tarjetas Idénticas) */}
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#f59e0b' }}>📋 Cotizaciones y Trabajos Pendientes de Aprobación</h3>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Cotizaciones y Trabajos Pendientes de Aprobación</h3>
             <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
               Listado exclusivo de cotizaciones pendientes para su seguimiento o confirmación con el cliente.
             </p>
@@ -609,31 +644,35 @@ export default function App() {
             {pendientesTrabajos.length === 0 ? (
               <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>¡Excelente! No hay cotizaciones pendientes en este momento.</p>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
                 {pendientesTrabajos.map((item) => {
                   const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
                   return (
-                    <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #f59e0b' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</span>
-                        <span style={{ backgroundColor: '#f59e0b22', color: '#f59e0b', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>Pendiente</span>
+                    <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#38bdf8', fontSize: '1.05rem' }}>N° {nroStr}</span>
+                        <span style={{ backgroundColor: '#f59e0b22', color: '#f59e0b', padding: '3px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>Pendiente</span>
                       </div>
-                      <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{item.cliente}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.4rem 0' }}>{item.descripcion}</div>
+                      
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{item.cliente}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
+                      </div>
                       
                       {item.imagen_archivo && (
-                        <img src={item.imagen_archivo} alt="Precaptura" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '6px', margin: '0.5rem 0' }} />
+                        <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #1e293b' }} />
                       )}
 
-                      <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.1rem', margin: '0.5rem 0' }}>
+                      <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.1rem' }}>
                         Total: ${Number(item.total).toLocaleString('es-CL')} CLP
                       </div>
 
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
                         <button onClick={() => cambiarEstado(item.id, item.estado)} style={{ flex: 1, backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
                           Aprobar / Pasar a Diseño
                         </button>
-                        <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>PDF</button>
+                        <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>PDF</button>
                       </div>
                     </div>
                   );
@@ -643,88 +682,81 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TABLERO GENERAL DE PRODUCCIÓN */}
+        {/* 3. TABLERO GENERAL DE PRODUCCIÓN (REDISENADO EN TARJETAS LIMPIAS Y ORGANIZADAS) */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#38bdf8' }}>Tablero de Taller y Fases de Producción</h3>
+              <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '1.4rem' }}>🛠️ Tablero de Taller y Fases de Producción</h3>
               <input type="text" placeholder="🔍 Buscar por empresa, RUT o material..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
             </div>
 
             {cotizaciones.length === 0 ? (
               <p style={{ color: '#a1a1aa', textAlign: 'center', padding: '2rem' }}>No hay trabajos registrados en el taller.</p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                      <th style={{ padding: '10px' }}>Boceto</th>
-                      <th style={{ padding: '10px' }}>N° Cot. / Empresa</th>
-                      <th style={{ padding: '10px' }}>Detalle</th>
-                      <th style={{ padding: '10px' }}>Total (IVA Incl.)</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>Estado Actual (Clic para avanzar)</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cotizaciones.filter(item => {
-                      const b = busqueda.toLowerCase();
-                      return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                    }).map((item) => {
-                      const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-                      const estadoActual = item.estado || 'Pendiente';
-                      return (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
-                          <td style={{ padding: '10px' }}>
-                            {item.imagen_archivo ? (
-                              <img src={item.imagen_archivo} alt="Precaptura" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #38bdf8' }} />
-                            ) : (
-                              <div style={{ width: '50px', height: '50px', backgroundColor: '#090d16', borderRadius: '6px', border: '1px solid #334155', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem' }}>Sin boceto</div>
-                            )}
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</div>
-                            <div style={{ color: '#f8fafc', fontWeight: 'bold' }}>{item.cliente}</div>
-                            <div style={{ color: '#a1a1aa', fontSize: '0.75rem' }}>RUT: {item.rut || 'S/N'}</div>
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <div style={{ color: '#e4e4e7' }}>{item.descripcion}</div>
-                            <div style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{item.ancho} x {item.alto} cm (Cant: {item.cantidad || 1})</div>
-                          </td>
-                          <td style={{ padding: '12px', fontWeight: 'bold', color: '#38bdf8' }}>
-                            ${Number(item.total).toLocaleString('es-CL')} CLP
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <button 
-                              onClick={() => cambiarEstado(item.id, estadoActual)} 
-                              title="Haz clic para avanzar de fase" 
-                              style={{ 
-                                backgroundColor: 'transparent', 
-                                border: `2px solid ${getColorEstado(estadoActual)}`, 
-                                color: getColorEstado(estadoActual), 
-                                padding: '8px 14px', 
-                                borderRadius: '16px', 
-                                cursor: 'pointer', 
-                                fontSize: '0.8rem', 
-                                fontWeight: 'bold', 
-                                whiteSpace: 'nowrap' 
-                              }}
-                            >
-                              📍 {estadoActual} ➔
-                            </button>
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                              <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
-                              <button onClick={() => enviarWhatsAppFormal(item)} style={{ backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
-                              <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>X</button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.2rem' }}>
+                {cotizaciones.filter(item => {
+                  const b = busqueda.toLowerCase();
+                  return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
+                }).map((item) => {
+                  const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+                  const estadoActual = item.estado || 'Pendiente';
+                  const colorEstado = getColorEstado(estadoActual);
+
+                  return (
+                    <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: `1px solid ${colorEstado}`, display: 'flex', flexDirection: 'column', gap: '0.8rem', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
+                      
+                      {/* Cabecera de tarjeta */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#38bdf8', fontSize: '1.05rem' }}>N° {nroStr}</span>
+                        <button 
+                          onClick={() => cambiarEstado(item.id, estadoActual)} 
+                          title="Haz clic para avanzar de fase" 
+                          style={{ 
+                            backgroundColor: `${colorEstado}22`, 
+                            border: `1px solid ${colorEstado}`, 
+                            color: colorEstado, 
+                            padding: '4px 10px', 
+                            borderRadius: '12px', 
+                            cursor: 'pointer', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 'bold' 
+                          }}
+                        >
+                          📍 {estadoActual} ➔
+                        </button>
+                      </div>
+
+                      {/* Información del cliente y detalle */}
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{item.cliente}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '2px' }}>{item.descripcion}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
+                      </div>
+
+                      {/* Boceto / Precaptura visual */}
+                      {item.imagen_archivo ? (
+                        <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '130px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #1e293b' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '60px', backgroundColor: '#131c2e', borderRadius: '6px', border: '1px dashed #334155', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.75rem' }}>
+                          Sin boceto adjunto
+                        </div>
+                      )}
+
+                      {/* Monto Total */}
+                      <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.1rem' }}>
+                        Total: ${Number(item.total).toLocaleString('es-CL')} CLP
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto', paddingTop: '0.4rem' }}>
+                        <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
+                        <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
+                        <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '7px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }} title="Eliminar">🗑️</button>
+                      </div>
+
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -771,7 +803,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listaEgresos.map((item) => (
+                  {listaEgresos.main ? listaEgresos : listaEgresos.map((item) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
                       <td style={{ padding: '12px' }}>{new Date(item.created_at).toLocaleDateString('es-CL')}</td>
                       <td style={{ padding: '12px', fontWeight: 'bold' }}>{item.descripcion}</td>
