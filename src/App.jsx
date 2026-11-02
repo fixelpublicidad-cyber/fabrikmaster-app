@@ -21,6 +21,7 @@ export default function App() {
   const [cantidad, setCantidad] = useState('1');
   const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
   const [imagenArchivo, setImagenArchivo] = useState('');
+  const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('');
 
   const preciosMateriales = {
     'Acrílico 3 mm Blanco': 90000,
@@ -53,13 +54,22 @@ export default function App() {
   const [costoMaterialBase, setCostoMaterialBase] = useState('');
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
+  const [metodoPago, setMetodoPago] = useState('Transferencia');
   
-  // Egresos y Filtro de Fechas
+  // Egresos, Inventario y Filtros
   const [descEgreso, setDescEgreso] = useState('');
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
   const [filtroMes, setFiltroMes] = useState('todos');
+
+  // Inventario local de bodega
+  const [inventario, setInventario] = useState([
+    { id: 1, material: 'Planchas Acrílico 3mm Blanco', stock: 10, unidad: 'planchas' },
+    { id: 2, material: 'Planchas Trovicel 3mm', stock: 15, unidad: 'planchas' },
+    { id: 3, material: 'Planchas Trovicel 5mm', stock: 8, unidad: 'planchas' },
+    { id: 4, material: 'Vinilo Adhesivo Impresión (Rollo)', stock: 2, unidad: 'rollos' },
+  ]);
 
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -82,7 +92,6 @@ export default function App() {
     if (!errEgr && dataEgr) setListaEgresos(dataEgr);
   };
 
-  // Detector global de Ctrl+V para pegar imágenes de referencia
   useEffect(() => {
     const handleGlobalPaste = (e) => {
       const items = e.clipboardData?.items;
@@ -188,10 +197,12 @@ export default function App() {
           total: totalConIva,
           extras: parseFloat(costoExtras) || 0,
           abono: abonoVal,
+          metodo_pago: metodoPago,
           costo_material: costoInt,
           margen_utilidad: margenPorcentaje,
           imagen_archivo: imagenArchivo,
           con_factura: conFactura,
+          fecha_entrega: fechaEntregaEstimada || null,
           estado: 'Pendiente'
         },
       ]);
@@ -215,6 +226,7 @@ export default function App() {
       setCostoExtras('');
       setAbono('');
       setImagenArchivo('');
+      setFechaEntregaEstimada('');
       setConFactura(true);
     }
   };
@@ -234,6 +246,7 @@ export default function App() {
     setCostoMaterialBase(String(item.costo_material || ''));
     setCostoExtras(String(item.extras || ''));
     setAbono(String(item.abono || ''));
+    setFechaEntregaEstimada(item.fecha_entrega || '');
     setImagenArchivo(item.imagen_archivo || '');
     setConFactura(item.con_factura !== false);
     setVistaActiva('cotizador');
@@ -335,21 +348,17 @@ export default function App() {
     doc.save(`Cotizacion_Fixel_${nroStr}.pdf`);
   };
 
-  // PDF FORMATO ORDEN DE TALLER CON LOGO OFICIAL
   const generarPDFOperativo = (item) => {
     const doc = new jsPDF();
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
     const fechaIngreso = new Date(item.created_at || Date.now()).toLocaleDateString('es-CL');
+    const fechaEntregaTxt = item.fecha_entrega ? new Date(item.fecha_entrega).toLocaleDateString('es-CL') : 'Por definir';
 
     // MARCO EXTERIOR GENERAL
     doc.setLineWidth(0.5);
     doc.rect(10, 10, 190, 277);
 
-    // ENCABEZADO CON LOGO OFICIAL DE FIXEL
-    const imgLogo = new Image();
-    imgLogo.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop'; // O tu logo oficial incorporado
-    
-    // Dibujamos el bloque superior con el texto exacto del logo
+    // ENCABEZADO CON LOGO OFICIAL
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(26);
     doc.setTextColor(0, 120, 255);
@@ -360,10 +369,9 @@ export default function App() {
     doc.setTextColor(0, 0, 0);
     doc.text('• NEON LED  •  LETREROS EN ACRÍLICO •', 105, 25, { align: 'center' });
 
-    // LÍNEA DIVISORIA ENCABEZADO
     doc.line(10, 30, 200, 30);
 
-    // DATOS CLIENTE (Heredados automáticamente)
+    // DATOS CLIENTE
     doc.setFontSize(9.5);
     doc.text(`Empresa: ${item.cliente || '---'}`, 14, 37);
     doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 37);
@@ -374,7 +382,7 @@ export default function App() {
     // N° OC Y FECHAS
     doc.text(`N°DE OC: ${nroStr}`, 14, 48);
     doc.text(`Fecha de Ingreso: ${fechaIngreso}`, 75, 48);
-    doc.text(`Fecha de Entrega: ____________`, 138, 48);
+    doc.text(`Fecha de Entrega: ${fechaEntregaTxt}`, 138, 48);
 
     doc.line(10, 52, 200, 52);
 
@@ -439,7 +447,7 @@ export default function App() {
     doc.setFont('helvetica', 'normal');
     doc.text('LASER', 50, 74);
     doc.rect(70, 70, 5, 5);
-    doc.setFillColor(255, 0, 0); // Casilla marcada en rojo
+    doc.setFillColor(255, 0, 0);
     doc.rect(71, 71, 3, 3, 'F');
 
     doc.text('ROUTER', 88, 74);
@@ -504,7 +512,12 @@ export default function App() {
     const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
     const facturaTxt = item.con_factura !== false ? '🧾 *IVA (19% incluido)*' : '📌 *Sin Factura (Venta Directa)*';
-    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto Total:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n${facturaTxt}\n\n_Validez de la cotización: 10 días._ ¡Quedamos atentos a sus comentarios!`;
+    
+    // Enlace de seguimiento en tiempo real simulado para el cliente
+    const linkSeguimiento = `https://fixel-manager.web.app/seguimiento/${item.id}`;
+
+    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto Total:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n${facturaTxt}\n\n🔍 Puedes revisar el estado de tu letrero en línea aquí:\n${linkSeguimiento}\n\n_Validez: 10 días._ ¡Quedamos atentos!`;
+    
     const url = telefono 
       ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}`
       : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
@@ -581,6 +594,7 @@ export default function App() {
         <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
         <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
         <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
+        {item.fecha_entrega && <div style={{ color: '#f59e0b', fontSize: '0.75rem' }}>📅 Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>}
         
         {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
         
@@ -591,7 +605,7 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8', marginTop: '2px' }}>
             <span>Abonado:</span>
-            <span>${abonoActual.toLocaleString('es-CL')}</span>
+            <span>${abonoActual.toLocaleString('es-CL')} ({item.metodo_pago || 'Transferencia'})</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: saldoPendiente > 0 ? '#f87171' : '#4ade80', marginTop: '2px' }}>
             <span>Saldo:</span>
@@ -634,7 +648,7 @@ export default function App() {
               onClick={() => setVistaActiva('cotizador')}
               style={{
                 flex: '1 1 0px',
-                minWidth: '200px',
+                minWidth: '180px',
                 backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`,
                 padding: '1rem',
@@ -652,7 +666,7 @@ export default function App() {
               onClick={() => setVistaActiva('pendientes')}
               style={{
                 flex: '1 1 0px',
-                minWidth: '200px',
+                minWidth: '180px',
                 backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`,
                 padding: '1rem',
@@ -664,7 +678,7 @@ export default function App() {
             >
               <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDEN DE TRABAJO</div>
               <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                2. Orden de Trabajo ({pendientesTrabajos.length})
+                2. Órdenes ({pendientesTrabajos.length})
               </div>
             </div>
 
@@ -672,7 +686,7 @@ export default function App() {
               onClick={() => setVistaActiva('produccion')}
               style={{
                 flex: '1 1 0px',
-                minWidth: '200px',
+                minWidth: '180px',
                 backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`,
                 padding: '1rem',
@@ -689,10 +703,50 @@ export default function App() {
             </div>
 
             <div 
+              onClick={() => setVistaActiva('calendario')}
+              style={{
+                flex: '1 1 0px',
+                minWidth: '180px',
+                backgroundColor: vistaActiva === 'calendario' ? '#0284c7' : '#0f172a',
+                border: `2px solid ${vistaActiva === 'calendario' ? '#38bdf8' : '#334155'}`,
+                padding: '1rem',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', color: '#a855f7', fontWeight: 'bold', letterSpacing: '0.05em' }}>AGENDA</div>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
+                4. Calendario Entregas
+              </div>
+            </div>
+
+            <div 
+              onClick={() => setVistaActiva('inventario')}
+              style={{
+                flex: '1 1 0px',
+                minWidth: '180px',
+                backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a',
+                border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`,
+                padding: '1rem',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', color: '#f97316', fontWeight: 'bold', letterSpacing: '0.05em' }}>BODEGA</div>
+              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
+                5. Inventario
+              </div>
+            </div>
+
+            <div 
               onClick={() => setVistaActiva('egresos')}
               style={{
                 flex: '1 1 0px',
-                minWidth: '200px',
+                minWidth: '180px',
                 backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a',
                 border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`,
                 padding: '1rem',
@@ -704,7 +758,7 @@ export default function App() {
             >
               <div style={{ fontSize: '0.75rem', color: '#f87171', fontWeight: 'bold', letterSpacing: '0.05em' }}>FINANZAS</div>
               <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                4. Egresos ({listaEgresos.length})
+                6. Egresos y Caja
               </div>
             </div>
 
@@ -868,7 +922,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#f87171', display: 'block', marginBottom: '0.4rem' }}>Costo Producción ($)</label>
                   <input type="number" value={costoMaterialBase} onChange={(e) => setCostoMaterialBase(e.target.value)} placeholder="Insumos" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
@@ -880,6 +934,19 @@ export default function App() {
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Abono Inicial ($)</label>
                   <input type="number" value={abono} onChange={(e) => setAbono(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '0.4rem' }}>Método de Pago</label>
+                  <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="WebPay">WebPay</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginBottom: '0.4rem' }}>Fecha de Entrega</label>
+                  <input type="date" value={fechaEntregaEstimada} onChange={(e) => setFechaEntregaEstimada(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
@@ -929,7 +996,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TALLER / KANBAN (SEGMENTADO POR FASES EN LISTADOS SEPARADOS) */}
+        {/* 3. TALLER / KANBAN */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
@@ -1037,7 +1104,75 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. EGRESOS Y FINANZAS */}
+        {/* 4. CALENDARIO DE ENTREGAS */}
+        {vistaActiva === 'calendario' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+            <h3 style={{ margin: 0, color: '#a855f7', marginBottom: '0.5rem' }}>📅 Calendario y Plazos de Entrega</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Trabajos ordenados cronológicamente por su fecha de entrega programada.
+            </p>
+
+            {cotizaciones.filter(c => c.fecha_entrega).length === 0 ? (
+              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay trabajos con fecha de entrega programada aún.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {cotizaciones.filter(c => c.fecha_entrega).sort((a,b) => new Date(a.fecha_entrega) - new Date(b.fecha_entrega)).map((item) => (
+                  <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 'bold' }}>📅 Fecha: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'white', marginTop: '2px' }}>{item.cliente}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>{item.descripcion}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <span style={{ backgroundColor: '#1e293b', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>{item.estado}</span>
+                      <button onClick={() => generarPDFOperativo(item)} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>PDF Taller</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. INVENTARIO / BODEGA */}
+        {vistaActiva === 'inventario' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+            <h3 style={{ margin: 0, color: '#f97316', marginBottom: '0.5rem' }}>📦 Control de Inventario y Bodega</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Stock disponible de planchas, acrílicos y materiales para tu taller.
+            </p>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                  <th style={{ padding: '12px' }}>Material / Insumo</th>
+                  <th style={{ padding: '12px' }}>Stock Actual</th>
+                  <th style={{ padding: '12px' }}>Unidad</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventario.map((inv) => (
+                  <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
+                    <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
+                    <td style={{ padding: '14px', color: inv.stock < 5 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>{inv.stock}</td>
+                    <td style={{ padding: '14px', color: '#94a3b8' }}>{inv.unidad}</td>
+                    <td style={{ padding: '14px', textAlign: 'center' }}>
+                      <button onClick={() => {
+                        const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
+                        if (nuevo !== null) {
+                          setInventario(inventario.map(i => i.id === inv.id ? {...i, stock: parseInt(nuevo) || 0} : i));
+                        }
+                      }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 6. EGRESOS Y FINANZAS */}
         {vistaActiva === 'egresos' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
