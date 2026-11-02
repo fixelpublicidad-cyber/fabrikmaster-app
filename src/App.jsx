@@ -12,7 +12,7 @@ export default function App() {
   const [giro, setGiro] = useState('');
   const [contacto, setContacto] = useState('');
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
-  const [conFactura, setConFactura] = useState(true); // Opciones: con factura/boleta o sin factura
+  const [conFactura, setConFactura] = useState(true);
 
   // Detalles del trabajo
   const [descripcion, setDescripcion] = useState('');
@@ -81,6 +81,29 @@ export default function App() {
     if (!errEgr && dataEgr) setListaEgresos(dataEgr);
   };
 
+  // Detector global de Ctrl+V para pegar imágenes directamente
+  useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setImagenArchivo(reader.result);
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, []);
+
   useEffect(() => {
     cargarDatos();
   }, []);
@@ -118,7 +141,6 @@ export default function App() {
     const extrasVal = parseFloat(costoExtras) || 0;
     const netoFinal = netoTotal + extrasVal;
     
-    // Si no requiere factura, el IVA no se suma al cobro final para cuadrar cuentas directas de taller
     const iva = conFactura ? Math.round(netoFinal * 0.19) : 0;
     const totalConIva = netoFinal + iva;
 
@@ -460,7 +482,7 @@ export default function App() {
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización Formal</h1>
             <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
-              Genera una orden interna, define si requiere factura o es venta sin factura, y exporta el PDF.
+              Genera una orden interna, presiona <code style={{ backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>Ctrl + V</code> en cualquier parte para pegar una imagen de referencia, y exporta el PDF.
             </p>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -536,7 +558,7 @@ export default function App() {
                 <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Impresión y laminado en Trovicel" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               </div>
 
-              {/* ZONA DE ARRASTRE Y CARGA DE IMÁGENES */}
+              {/* ZONA DE ARRASTRE Y PEGADO CON CTRL+V */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imágenes de referencia (opcional)</label>
                 <div 
@@ -556,8 +578,8 @@ export default function App() {
                   }}
                 >
                   <div style={{ fontSize: '2rem' }}>🖼️</div>
-                  <div style={{ fontSize: '0.95rem', color: '#e2e8f0' }}>Arrastra imágenes o pega con Ctrl+V</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>También con los botones de abajo. Pre-captura o boceto de diseño.</div>
+                  <div style={{ fontSize: '0.95rem', color: '#e2e8f0' }}>Arrastra imágenes o presiona <code style={{ color: '#38bdf8' }}>Ctrl + V</code> en cualquier parte</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>También puedes usar el botón de abajo. Pre-captura o boceto de diseño.</div>
                   
                   {imagenArchivo && (
                     <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#131c2e', padding: '8px 12px', borderRadius: '8px', border: '1px solid #38bdf8' }}>
@@ -633,7 +655,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. PESTAÑA DEDICADA DE TRABAJOS PENDIENTES (En Tarjetas Idénticas) */}
+        {/* 2. PESTAÑA DEDICADA DE TRABAJOS PENDIENTES */}
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Cotizaciones y Trabajos Pendientes de Aprobación</h3>
@@ -682,7 +704,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TABLERO GENERAL DE PRODUCCIÓN (REDISENADO EN TARJETAS LIMPIAS Y ORGANIZADAS) */}
+        {/* 3. TABLERO GENERAL DE PRODUCCIÓN */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -705,7 +727,6 @@ export default function App() {
                   return (
                     <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: `1px solid ${colorEstado}`, display: 'flex', flexDirection: 'column', gap: '0.8rem', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
                       
-                      {/* Cabecera de tarjeta */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 'bold', color: '#38bdf8', fontSize: '1.05rem' }}>N° {nroStr}</span>
                         <button 
@@ -726,14 +747,12 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* Información del cliente y detalle */}
                       <div>
                         <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{item.cliente}</div>
                         <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '2px' }}>{item.descripcion}</div>
                         <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
                       </div>
 
-                      {/* Boceto / Precaptura visual */}
                       {item.imagen_archivo ? (
                         <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '130px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #1e293b' }} />
                       ) : (
@@ -742,12 +761,10 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Monto Total */}
                       <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.1rem' }}>
                         Total: ${Number(item.total).toLocaleString('es-CL')} CLP
                       </div>
 
-                      {/* Botones de acción */}
                       <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto', paddingTop: '0.4rem' }}>
                         <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
                         <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
@@ -803,7 +820,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listaEgresos.main ? listaEgresos : listaEgresos.map((item) => (
+                  {listaEgresos.map((item) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
                       <td style={{ padding: '12px' }}>{new Date(item.created_at).toLocaleDateString('es-CL')}</td>
                       <td style={{ padding: '12px', fontWeight: 'bold' }}>{item.descripcion}</td>
