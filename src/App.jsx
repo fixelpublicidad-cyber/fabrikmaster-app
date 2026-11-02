@@ -335,7 +335,7 @@ export default function App() {
     doc.save(`Cotizacion_Fixel_${nroStr}.pdf`);
   };
 
-  // PDF FORMATO ORDEN DE TALLER EXACTO (COMO LA REFERENCIA)
+  // PDF FORMATO ORDEN DE TALLER CON LOGO OFICIAL
   const generarPDFOperativo = (item) => {
     const doc = new jsPDF();
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
@@ -345,131 +345,138 @@ export default function App() {
     doc.setLineWidth(0.5);
     doc.rect(10, 10, 190, 277);
 
-    // ENCABEZADO TALLER (FIXEL)
+    // ENCABEZADO CON LOGO OFICIAL DE FIXEL
+    const imgLogo = new Image();
+    imgLogo.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop'; // O tu logo oficial incorporado
+    
+    // Dibujamos el bloque superior con el texto exacto del logo
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(28);
+    doc.setFontSize(26);
+    doc.setTextColor(0, 120, 255);
+    doc.text('FIXEL', 105, 20, { align: 'center' });
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
     doc.setTextColor(0, 0, 0);
-    doc.text('FIXEL', 105, 22, { align: 'center' });
-    doc.setFontSize(9);
-    doc.text('• P U B L I C I D A D •', 105, 27, { align: 'center' });
+    doc.text('• NEON LED  •  LETREROS EN ACRÍLICO •', 105, 25, { align: 'center' });
 
     // LÍNEA DIVISORIA ENCABEZADO
-    doc.line(10, 32, 200, 32);
+    doc.line(10, 30, 200, 30);
 
-    // DATOS CLIENTE
-    doc.setFontSize(10);
-    doc.text(`Empresa: ${item.cliente || '---'}`, 14, 39);
-    doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 39);
-    doc.text(`Solicito: ${item.contacto || '---'}`, 150, 39);
+    // DATOS CLIENTE (Heredados automáticamente)
+    doc.setFontSize(9.5);
+    doc.text(`Empresa: ${item.cliente || '---'}`, 14, 37);
+    doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 37);
+    doc.text(`Solicito: ${item.contacto || '---'}`, 150, 37);
 
-    doc.line(10, 43, 200, 43);
+    doc.line(10, 41, 200, 41);
 
     // N° OC Y FECHAS
-    doc.text(`N°DE OC: ${nroStr}`, 14, 50);
-    doc.text(`Fecha de Ingreso: ${fechaIngreso}`, 75, 50);
-    doc.text(`Fecha de Entrega: ____________`, 138, 50);
+    doc.text(`N°DE OC: ${nroStr}`, 14, 48);
+    doc.text(`Fecha de Ingreso: ${fechaIngreso}`, 75, 48);
+    doc.text(`Fecha de Entrega: ____________`, 138, 48);
 
-    doc.line(10, 54, 200, 54);
+    doc.line(10, 52, 200, 52);
 
     // IMPRESIÓN
     doc.setFillColor(0, 0, 0);
-    doc.rect(10, 54, 32, 8, 'F');
+    doc.rect(10, 52, 32, 8, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Impresión', 12, 60);
+    doc.text('Impresión', 12, 58);
 
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text('ADHESIVO', 46, 60);
-    doc.rect(70, 56, 5, 5);
+    doc.setFontSize(8.5);
+    doc.text('ADHESIVO', 46, 58);
+    doc.rect(70, 54, 5, 5);
 
-    doc.text('ONE VISION', 80, 60);
-    doc.rect(104, 56, 5, 5);
+    doc.text('ONE VISION', 80, 58);
+    doc.rect(104, 54, 5, 5);
 
-    doc.text('TELA PVC', 114, 60);
-    doc.rect(134, 56, 5, 5);
+    doc.text('TELA PVC', 114, 58);
+    doc.rect(134, 54, 5, 5);
 
-    doc.text('PANAFLEX', 144, 60);
-    doc.rect(168, 56, 5, 5);
+    doc.text('PANAFLEX', 144, 58);
+    doc.rect(168, 54, 5, 5);
 
-    doc.text('BLACKOUT', 174, 60);
-    doc.rect(193, 56, 5, 5); // Ajustado para que quepa bien
+    doc.text('BLACKOUT', 174, 58);
+    doc.rect(193, 54, 5, 5);
 
-    doc.line(10, 62, 200, 62);
+    doc.line(10, 60, 200, 60);
 
     // LAMINADO
     doc.setFillColor(0, 0, 0);
-    doc.rect(10, 62, 32, 8, 'F');
+    doc.rect(10, 60, 32, 8, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Laminado', 12, 68);
+    doc.text('Laminado', 12, 66);
 
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
-    doc.text('PVC MATE', 46, 68);
-    doc.rect(70, 64, 5, 5);
+    doc.text('PVC MATE', 46, 66);
+    doc.rect(70, 62, 5, 5);
 
-    doc.text('PVC BRILLANTE', 80, 68);
-    doc.rect(114, 64, 5, 5);
+    doc.text('PVC BRILLANTE', 80, 66);
+    doc.rect(114, 62, 5, 5);
 
-    doc.text('TROQUEL', 124, 68);
-    doc.rect(149, 64, 5, 5);
+    doc.text('TROQUEL', 124, 66);
+    doc.rect(149, 62, 5, 5);
 
-    doc.text('SIN LAMINAR', 155, 68);
-    doc.rect(193, 64, 5, 5);
+    doc.text('SIN LAMINAR', 155, 66);
+    doc.rect(193, 62, 5, 5);
 
-    doc.line(10, 70, 200, 70);
+    doc.line(10, 68, 200, 68);
 
     // CORTE
     doc.setFillColor(0, 0, 0);
-    doc.rect(10, 70, 32, 8, 'F');
+    doc.rect(10, 68, 32, 8, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Corte', 12, 76);
+    doc.text('Corte', 12, 74);
 
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
-    doc.text('LASER', 50, 76);
-    doc.rect(70, 72, 5, 5);
-    doc.setFillColor(255, 0, 0); // Casilla roja marcada como en la referencia si es láser
-    doc.rect(71, 73, 3, 3, 'F');
+    doc.text('LASER', 50, 74);
+    doc.rect(70, 70, 5, 5);
+    doc.setFillColor(255, 0, 0); // Casilla marcada en rojo
+    doc.rect(71, 71, 3, 3, 'F');
 
-    doc.text('ROUTER', 88, 76);
-    doc.rect(114, 72, 5, 5);
+    doc.text('ROUTER', 88, 74);
+    doc.rect(114, 70, 5, 5);
 
-    doc.text('MANUAL', 130, 76);
-    doc.rect(149, 72, 5, 5);
+    doc.text('MANUAL', 130, 74);
+    doc.rect(149, 70, 5, 5);
 
-    doc.text('INSTALACION', 159, 76);
-    doc.rect(193, 72, 5, 5);
+    doc.text('INSTALACION', 159, 74);
+    doc.rect(193, 70, 5, 5);
 
-    doc.line(10, 78, 200, 78);
+    doc.line(10, 76, 200, 76);
 
     // OBSERVACIONES
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.text(`Observaciones: ${item.descripcion || 'Ninguna'}`, 12, 84);
+    doc.text(`Observaciones: ${item.descripcion || 'Ninguna'}`, 12, 82);
 
-    doc.line(10, 88, 200, 88);
+    doc.line(10, 86, 200, 86);
 
     // FRANJA NEGRA ADVERTENCIA
     doc.setFillColor(0, 0, 0);
-    doc.rect(10, 88, 190, 7, 'F');
+    doc.rect(10, 86, 190, 7, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.text('REVISAR CUIDADOSAMENTE CADA DETALLE DE LOS DISEÑOS E INFORMAR CUALQUIER IRREGULARIDAD O DUDA', 105, 92.5, { align: 'center' });
+    doc.setFontSize(8);
+    doc.text('REVISAR CUIDADOSAMENTE CADA DETALLE DE LOS DISEÑOS E INFORMAR CUALQUIER IRREGULARIDAD O DUDA', 105, 90.5, { align: 'center' });
 
-    // ZONA DE BOCETO / IMAGEN
+    // ZONA DE BOCETO / IMAGEN CON MEDIDAS
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(200, 0, 0);
-    doc.text(`${item.ancho || 0}x${item.alto || 0} cm`, 105, 103, { align: 'center' });
+    doc.text(`${item.ancho || 0}x${item.alto || 0} cm`, 105, 101, { align: 'center' });
 
     if (item.imagen_archivo) {
       try {
-        doc.addImage(item.imagen_archivo, 'JPEG', 35, 108, 140, 110);
+        doc.addImage(item.imagen_archivo, 'JPEG', 35, 105, 140, 115);
       } catch (e) {
         console.error(e);
       }
