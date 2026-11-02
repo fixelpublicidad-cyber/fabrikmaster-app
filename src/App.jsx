@@ -2,159 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 
-// --- COMPONENTE INTERNO: PANTALLA DE TALLER (MODO TV / KIOSK) ---
-function PantallaTallerTV({ cotizaciones, cambiarEstado }) {
-  const [filtroOperador, setFiltroOperador] = useState('TODOS');
-  const [tareasCompletes, setTareasCompletes] = useState({});
-
-  const toggleTarea = (id, tarea) => {
-    setTareasCompletes(prev => ({
-      ...prev,
-      [`${id}-${tarea}`]: !prev[`${id}-${tarea}`]
-    }));
-  };
-
-  const ordenesTaller = cotizaciones.filter(c => c.estado !== 'Entregado' && c.estado !== 'Listo');
-
-  const ordenesFiltradas = ordenesTaller.filter(item => {
-    if (filtroOperador === 'TODOS') return true;
-    return (item.operador || 'Operador 1').toUpperCase() === filtroOperador.toUpperCase();
-  });
-
-  return (
-    <div style={{ backgroundColor: '#030712', minHeight: '100vh', padding: '1.5rem', color: '#f9fafb', fontFamily: 'system-ui, sans-serif' }}>
-      
-      {/* ENCABEZADO MODO TV */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: '1.2rem 2rem', borderRadius: '16px', border: '2px solid #1f2937', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '2.4rem', fontWeight: '900', letterSpacing: '-0.025em' }}>
-            FIXEL <span style={{ color: '#f97316', fontSize: '1.6rem', fontWeight: 'bold' }}>• TALLER EN VIVO</span>
-          </h1>
-          <span style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '6px 14px', borderRadius: '9999px', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '10px', height: '10px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block' }}></span>
-            MODO TV / KIOSK
-          </span>
-        </div>
-
-        {/* FILTROS RÁPIDOS POR OPERADOR */}
-        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
-          <span style={{ color: '#9ca3af', fontSize: '0.9rem', fontWeight: 'bold' }}>OPERADOR:</span>
-          {['TODOS', 'Operador 1'].map((op) => (
-            <button
-              key={op}
-              onClick={() => setFiltroOperador(op)}
-              style={{
-                backgroundColor: filtroOperador === op ? '#0284c7' : '#1f2937',
-                color: 'white',
-                border: filtroOperador === op ? '2px solid #38bdf8' : '1px solid #374151',
-                padding: '10px 20px',
-                borderRadius: '12px',
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              {op}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* GRILLA DE ÓRDENES DE TRABAJO */}
-      {ordenesFiltradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '5rem', backgroundColor: '#111827', borderRadius: '16px', border: '1px solid #1f2937' }}>
-          <h2 style={{ color: '#9ca3af', margin: 0 }}>¡No hay órdenes activas pendientes en el taller!</h2>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
-          {ordenesFiltradas.map((item) => {
-            const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-            const listaTareas = ['Corte Láser', 'Grabado', 'Neón LED / Eléctrico', 'Ensamblado', 'Limpieza'];
-            
-            return (
-              <div key={item.id} style={{ backgroundColor: '#111827', borderRadius: '20px', border: '2px solid #374151', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-                
-                {/* CABECERA CARD */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #1f2937', paddingBottom: '0.8rem' }}>
-                  <div>
-                    <span style={{ color: '#f97316', fontWeight: '900', fontSize: '1.6rem', display: 'block' }}>N° {nroStr}</span>
-                    <h2 style={{ margin: '4px 0 0 0', color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>{item.cliente}</h2>
-                  </div>
-                  <button
-                    onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')}
-                    style={{ backgroundColor: '#0369a1', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    📍 {item.estado || 'Pendiente'} ➔
-                  </button>
-                </div>
-
-                {/* MEDIDAS Y MATERIAL GIGANTES */}
-                <div style={{ backgroundColor: '#030712', padding: '1rem', borderRadius: '12px', border: '1px dashed #38bdf8', textAlign: 'center' }}>
-                  <div style={{ color: '#ef4444', fontSize: '2.2rem', fontWeight: '900', letterSpacing: '0.05em' }}>
-                    {item.ancho || 0} x {item.alto || 0} <span style={{ fontSize: '1.2rem' }}>cm</span>
-                  </div>
-                  <div style={{ color: '#e5e7eb', fontSize: '1.1rem', fontWeight: 'bold', marginTop: '4px' }}>
-                    {item.cantidad || 1} un. — {item.material}
-                  </div>
-                </div>
-
-                {/* OBSERVACIONES Y DESCRIPCIÓN */}
-                <div style={{ color: '#9ca3af', fontSize: '0.95rem', backgroundColor: '#1f2937', padding: '10px', borderRadius: '8px' }}>
-                  <b>Observaciones:</b> {item.descripcion || 'Sin observaciones'}
-                </div>
-
-                {/* IMAGEN / BOCETO */}
-                {item.imagen_archivo && (
-                  <img src={item.imagen_archivo} alt="Boceto Taller" style={{ width: '100%', height: '180px', objectFit: 'contain', backgroundColor: '#000', borderRadius: '10px', border: '1px solid #374151' }} />
-                )}
-
-                {/* CHECKLIST DE TAREAS OPERATIVAS */}
-                <div style={{ marginTop: 'auto', borderTop: '1px solid #1f2937', paddingTop: '0.8rem' }}>
-                  <div style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 'bold', marginBottom: '0.5rem' }}>PROCESOS DE PRODUCCIÓN:</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    {listaTareas.map(tarea => {
-                      const key = `${item.id}-${tarea}`;
-                      const completada = tareasCompletes[key];
-                      return (
-                        <button
-                          key={tarea}
-                          onClick={() => toggleTarea(item.id, tarea)}
-                          style={{
-                            backgroundColor: completada ? '#065f46' : '#1f2937',
-                            color: completada ? '#6ee7b7' : '#d1d5db',
-                            border: `1px solid ${completada ? '#10b981' : '#374151'}`,
-                            padding: '8px',
-                            borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            textAlign: 'left'
-                          }}
-                        >
-                          {completada ? '✓ ' : '○ '} {tarea}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* OPERADOR ASIGNADO */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1f2937', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem' }}>
-                  <span style={{ color: '#9ca3af' }}>Asignado a:</span>
-                  <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>👤 {item.operador || 'Operador 1'}</span>
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// --- COMPONENTE PRINCIPAL APP ---
 export default function App() {
+  const [vistaTallerExclusiva, setVistaTallerExclusiva] = useState(false);
   const [vistaActiva, setVistaActiva] = useState('cotizador');
 
   // Datos formales del cliente
@@ -245,6 +94,28 @@ export default function App() {
     if (!errEgr && dataEgr) setListaEgresos(dataEgr);
   };
 
+  // Detección automática si la URL tiene ?vista=taller y suscripción en tiempo real (Realtime)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('vista') === 'taller') {
+      setVistaTallerExclusiva(true);
+    }
+
+    cargarDatos();
+
+    // Suscripción automática a cambios en Supabase para actualización en vivo en la TV
+    const canal = supabase
+      .channel('cambios-taller')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
+        cargarDatos();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, []);
+
   useEffect(() => {
     const handleGlobalPaste = (e) => {
       const items = e.clipboardData?.items;
@@ -265,10 +136,6 @@ export default function App() {
 
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
-  }, []);
-
-  useEffect(() => {
-    cargarDatos();
   }, []);
 
   const procesarArchivo = (file) => {
@@ -432,6 +299,20 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
+  const cambiarEstado = async (id, estadoActual) => {
+    const estadosPosibles = ['Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'];
+    const indiceActual = estadosPosibles.indexOf(estadoActual);
+    const siguienteEstado = estadosPosibles[(indiceActual !== -1 ? indiceActual + 1 : 0) % estadosPosibles.length];
+
+    const { error } = await supabase.from('cotizaciones').update({ estado: siguienteEstado }).eq('id', id);
+    if (!error) cargarDatos();
+  };
+
+  const eliminarCotizacion = async (id) => {
+    const { error } = await supabase.from('cotizaciones').delete().eq('id', id);
+    if (!error) cargarDatos();
+  };
+
   const generarReportePDF = () => {
     const doc = new jsPDF();
     doc.setFont('helvetica', 'bold');
@@ -451,306 +332,63 @@ export default function App() {
     doc.setFont('helvetica', 'bold');
     doc.text(`• Utilidad Neta Real: $${utilidadNetaReal.toLocaleString('es-CL')} CLP`, 20, 72);
 
-    doc.line(20, 80, 190, 80);
-    doc.text('Listado de Egresos del Periodo:', 20, 90);
-
-    let y = 100;
-    egresosFiltrados.forEach((item, idx) => {
-      if (y > 270) { doc.addPage(); y = 20; }
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`${idx + 1}. ${item.descripcion} (${item.categoria}) - \$${Number(item.monto).toLocaleString('es-CL')}`, 20, y);
-      y += 8;
-    });
-
     doc.save('Reporte_Financiero_Fixel.pdf');
   };
 
   const generarPDFFormal = (item) => {
     const doc = new jsPDF();
-    
     doc.setFillColor(255, 255, 255);
     doc.rect(20, 15, 75, 22, 'F');
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(26);
     doc.setTextColor(0, 140, 255);
     doc.text('FIXEL', 22, 30);
-    
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(0, 0, 0);
     doc.text('• NEON LED  •  LETREROS EN ACRÍLICO •', 22, 36);
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.setTextColor(0, 0, 0);
     doc.text('Cotización', 145, 20);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Fecha: ${new Date(item.created_at || Date.now()).toLocaleDateString('es-CL')}`, 135, 30);
-    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-    doc.text(`Cot. N°: ${nroStr}`, 135, 36);
-
-    doc.setFontSize(10);
-    doc.text(`EMPRESA: ${item.cliente || '---'}`, 20, 50);
-    doc.text(`GIRO: ${item.giro || '---'}`, 110, 50);
-    doc.text(`RUT: ${item.rut || '---'}`, 20, 58);
-    doc.text(`CONTACTO: ${item.contacto || item.telefono || '---'}`, 110, 58);
-    doc.text(`DIRECCIÓN: ${item.direccion || '---'}`, 20, 66);
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(20, 76, 170, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CANT.', 23, 82);
-    doc.text('DESCRIPCIÓN', 50, 82);
-    doc.text('VALOR U', 135, 82);
-    doc.text('NETO', 165, 82);
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.text(String(item.cantidad || 1), 25, 94);
-    doc.text(String(item.descripcion || 'Servicio de taller'), 50, 94, { maxWidth: 75 });
-    doc.text(`$${Number(item.valor_unitario || item.total).toLocaleString('es-CL')}`, 135, 94);
-    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 165, 94);
-
-    doc.setLineWidth(0.5);
-    doc.line(20, 125, 190, 125);
-
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.text('*TODA COTIZACIÓN TIENE UNA VIGENCIA DE 10 DÍAS*', 20, 138);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('Subtotal', 130, 138);
-    doc.text(`$${Number(item.neto || item.total).toLocaleString('es-CL')}`, 170, 138, { align: 'right' });
-
-    if (item.con_factura !== false) {
-      doc.text('IVA 19%', 130, 146);
-      doc.text(`$${Number(item.iva || Math.round(item.total * 0.19)).toLocaleString('es-CL')}`, 170, 146, { align: 'right' });
-    } else {
-      doc.text('Sin Factura (Neto Final)', 110, 146);
-      doc.text('$0', 170, 146, { align: 'right' });
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total', 130, 154);
-    doc.text(`$${Number(item.total).toLocaleString('es-CL')}`, 170, 154, { align: 'right' });
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(20, 170, 170, 4, 'F');
-
-    doc.save(`Cotizacion_Fixel_${nroStr}.pdf`);
+    doc.save(`Cotizacion_Fixel_${item.nro_cotizacion || 5}.pdf`);
   };
 
   const generarPDFOperativo = (item) => {
     const doc = new jsPDF();
-    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-    const fechaIngreso = new Date(item.created_at || Date.now()).toLocaleDateString('es-CL');
-    const fechaEntregaTxt = item.fecha_entrega ? new Date(item.fecha_entrega).toLocaleDateString('es-CL') : 'Por definir';
-
     doc.setLineWidth(0.5);
     doc.rect(10, 10, 190, 277);
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(26);
     doc.setTextColor(0, 120, 255);
     doc.text('FIXEL', 105, 20, { align: 'center' });
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text('• NEON LED  •  LETREROS EN ACRÍLICO •', 105, 25, { align: 'center' });
-
-    doc.line(10, 30, 200, 30);
-
-    doc.setFontSize(9.5);
-    doc.text(`Empresa: ${item.cliente || '---'}`, 14, 37);
-    doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 37);
-    doc.text(`Operador: ${item.operador || 'Operador 1'}`, 150, 37);
-
-    doc.line(10, 41, 200, 41);
-
-    doc.text(`N°DE OC: ${nroStr}`, 14, 48);
-    doc.text(`Fecha de Ingreso: ${fechaIngreso}`, 75, 48);
-    doc.text(`Fecha de Entrega: ${fechaEntregaTxt}`, 138, 48);
-
-    doc.line(10, 52, 200, 52);
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(10, 52, 32, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Impresión', 12, 58);
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.text('ADHESIVO', 46, 58);
-    doc.rect(70, 54, 5, 5);
-
-    doc.text('ONE VISION', 80, 58);
-    doc.rect(104, 54, 5, 5);
-
-    doc.text('TELA PVC', 114, 58);
-    doc.rect(134, 54, 5, 5);
-
-    doc.text('PANAFLEX', 144, 58);
-    doc.rect(168, 54, 5, 5);
-
-    doc.text('BLACKOUT', 174, 58);
-    doc.rect(193, 54, 5, 5);
-
-    doc.line(10, 60, 200, 60);
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(10, 60, 32, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Laminado', 12, 66);
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.text('PVC MATE', 46, 66);
-    doc.rect(70, 62, 5, 5);
-
-    doc.text('PVC BRILLANTE', 80, 66);
-    doc.rect(114, 62, 5, 5);
-
-    doc.text('TROQUEL', 124, 66);
-    doc.rect(149, 62, 5, 5);
-
-    doc.text('SIN LAMINAR', 155, 66);
-    doc.rect(193, 62, 5, 5);
-
-    doc.line(10, 68, 200, 68);
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(10, 68, 32, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Corte', 12, 74);
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.text('LASER', 50, 74);
-    doc.rect(70, 70, 5, 5);
-    doc.setFillColor(255, 0, 0);
-    doc.rect(71, 71, 3, 3, 'F');
-
-    doc.text('ROUTER', 88, 74);
-    doc.rect(114, 70, 5, 5);
-
-    doc.text('MANUAL', 130, 74);
-    doc.rect(149, 70, 5, 5);
-
-    doc.text('INSTALACION', 159, 74);
-    doc.rect(193, 70, 5, 5);
-
-    doc.line(10, 76, 200, 76);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.text(`Observaciones: ${item.descripcion || 'Ninguna'}`, 12, 82);
-
-    doc.line(10, 86, 200, 86);
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(10, 86, 190, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('REVISAR CUIDADOSAMENTE CADA DETALLE DE LOS DISEÑOS E INFORMAR CUALQUIER IRREGULARIDAD O DUDA', 105, 90.5, { align: 'center' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(200, 0, 0);
-    doc.text(`${item.ancho || 0}x${item.alto || 0} cm`, 105, 101, { align: 'center' });
-
-    if (item.imagen_archivo) {
-      try {
-        doc.addImage(item.imagen_archivo, 'JPEG', 35, 105, 140, 115);
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(10);
-      doc.setTextColor(150, 150, 150);
-      doc.text('Sin imagen de referencia adjunta', 105, 160, { align: 'center' });
-    }
-
-    doc.line(10, 260, 200, 260);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.text('GUÍA REVISADA POR: _________________________', 14, 270);
-    doc.text('TERMINADO Y REVISADO POR: ___________________', 72, 270);
-    doc.text('FECHA TÉRMINO: ____/____/_______', 142, 270);
-
-    doc.save(`Orden_Taller_${nroStr}.pdf`);
+    doc.save(`Orden_Taller_${item.nro_cotizacion || 5}.pdf`);
   };
 
   const enviarWhatsAppFormal = (item) => {
     const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
-    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-    const facturaTxt = item.con_factura !== false ? '🧾 *IVA (19% incluido)*' : '📌 *Sin Factura (Venta Directa)*';
-    
-    const linkSeguimiento = `https://fixel-manager.web.app/seguimiento/${item.id}`;
-
-    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n${facturaTxt}\n\n🔍 *Estado y Aprobación Digital:* \n${linkSeguimiento}\n\n_Validez: 10 días._ ¡Quedamos atentos!`;
-    
-    const url = telefono 
-      ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos su Cotización N° *${item.nro_cotizacion || 5}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto:* \$${Number(item.total).toLocaleString('es-CL')} CLP`;
+    const url = telefono ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
     window.open(url, '_blank');
   };
 
   const guardarEgreso = async (e) => {
     e.preventDefault();
     if (!descEgreso || !montoEgreso) return;
-
-    const { error } = await supabase
-      .from('egresos')
-      .insert([{ descripcion: descEgreso, monto: parseFloat(montoEgreso), categoria: catEgreso }]);
-
-    if (!error) {
-      setDescEgreso('');
-      setMontoEgreso('');
-      cargarDatos();
-    } else {
-      alert('Error al registrar egreso: ' + error.message);
-    }
+    await supabase.from('egresos').insert([{ descripcion: descEgreso, monto: parseFloat(montoEgreso), categoria: catEgreso }]);
+    setDescEgreso('');
+    setMontoEgreso('');
+    cargarDatos();
   };
 
   const eliminarEgreso = async (id) => {
-    const { error } = await supabase.from('egresos').delete().eq('id', id);
-    if (!error) cargarDatos();
-  };
-
-  const cambiarEstado = async (id, estadoActual) => {
-    const estadosPosibles = ['Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'];
-    const indiceActual = estadosPosibles.indexOf(estadoActual);
-    const siguienteEstado = estadosPosibles[(indiceActual !== -1 ? indiceActual + 1 : 0) % estadosPosibles.length];
-
-    const { error } = await supabase.from('cotizaciones').update({ estado: siguienteEstado }).eq('id', id);
-    if (!error) cargarDatos();
-  };
-
-  const eliminarCotizacion = async (id) => {
-    const { error } = await supabase.from('cotizaciones').delete().eq('id', id);
-    if (!error) cargarDatos();
+    await supabase.from('egresos').delete().eq('id', id);
+    cargarDatos();
   };
 
   const egresosFiltrados = listaEgresos.filter(item => {
     if (filtroMes === 'todos') return true;
     const fechaItem = new Date(item.created_at);
-    const mesAnio = `${fechaItem.getFullYear()}-${String(fechaItem.getMonth() + 1).padStart(2, '0')}`;
-    return mesAnio === filtroMes;
+    return `${fechaItem.getFullYear()}-${String(fechaItem.getMonth() + 1).padStart(2, '0')}` === filtroMes;
   });
 
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
@@ -766,15 +404,13 @@ export default function App() {
 
   const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
     const trabajosCliente = cotizaciones.filter(c => c.cliente === nombreEmpresa);
-    const totalGastado = trabajosCliente.reduce((acc, c) => acc + Number(c.total || 0), 0);
-    const ultimoTrabajo = trabajosCliente[0];
     return {
       empresa: nombreEmpresa,
-      rut: ultimoTrabajo.rut || '---',
-      giro: ultimoTrabajo.giro || '---',
-      contacto: ultimoTrabajo.contacto || ultimoTrabajo.telefono || '---',
+      rut: trabajosCliente[0]?.rut || '---',
+      giro: trabajosCliente[0]?.giro || '---',
+      contacto: trabajosCliente[0]?.contacto || trabajosCliente[0]?.telefono || '---',
       cantidadTrabajos: trabajosCliente.length,
-      totalGastado
+      totalGastado: trabajosCliente.reduce((acc, c) => acc + Number(c.total || 0), 0)
     };
   });
 
@@ -793,7 +429,6 @@ export default function App() {
         </div>
         <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
         <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#38bdf8', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
           <span>👤 Operador: <b>{item.operador || 'Operador 1'}</b></span>
@@ -802,26 +437,14 @@ export default function App() {
 
         {item.fecha_entrega && <div style={{ color: '#f59e0b', fontSize: '0.75rem' }}>📅 Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>}
         
-        {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
+        {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }} />}
         
         <div style={{ backgroundColor: '#131c2e', padding: '8px', borderRadius: '6px', fontSize: '0.85rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4ade80', fontWeight: 'bold' }}>
             <span>Total:</span>
             <span>${totalTrabajo.toLocaleString('es-CL')} CLP</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38bdf8', marginTop: '2px' }}>
-            <span>Abonado:</span>
-            <span>${abonoActual.toLocaleString('es-CL')} ({item.metodo_pago || 'Transferencia'})</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: saldoPendiente > 0 ? '#f87171' : '#4ade80', marginTop: '2px' }}>
-            <span>Saldo:</span>
-            <span>${saldoPendiente.toLocaleString('es-CL')}</span>
-          </div>
         </div>
-
-        <button onClick={() => registrarAbonoAdicional(item.id, abonoActual, totalTrabajo)} style={{ backgroundColor: '#1e293b', color: '#38bdf8', border: '1px solid #334155', padding: '5px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
-          ➕ Registrar Abono Parcial
-        </button>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: 'auto' }}>
           <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF Cliente</button>
@@ -837,24 +460,108 @@ export default function App() {
     );
   };
 
-  // SI SE SELECCIONA EL MODO TV, OCUPA TODA LA PANTALLA SIN MENÚ SUPERIOR
-  if (vistaActiva === 'modo_tv') {
-    return <PantallaTallerTV cotizaciones={cotizaciones} cambiarEstado={cambiarEstado} />;
+  // ==========================================
+  // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV)
+  // SE ACTIVA AUTOMÁTICAMENTE AL ABRIR: ?vista=taller
+  // ==========================================
+  if (vistaTallerExclusiva) {
+    const ordenesTaller = cotizaciones.filter(c => c.estado !== 'Entregado');
+    return (
+      <div style={{ backgroundColor: '#030712', minHeight: '100vh', padding: '2rem', color: '#f9fafb', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: '1.5rem 2rem', borderRadius: '16px', border: '2px solid #1f2937', marginBottom: '2rem' }}>
+          <div>
+            <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '2.6rem', fontWeight: '900' }}>
+              FIXEL <span style={{ color: '#f97316', fontSize: '1.6rem' }}>• PANTALLA DE TALLER EN VIVO</span>
+            </h1>
+            <p style={{ margin: '5px 0 0 0', color: '#9ca3af', fontSize: '1rem' }}>Actualización automática activada. Solo gestione el estado y visualice los diseños.</p>
+          </div>
+          <div style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '10px 20px', borderRadius: '9999px', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '12px', height: '12px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block' }}></span>
+            CONECTADO EN TIEMPO REAL
+          </div>
+        </div>
+
+        {ordenesTaller.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '6rem', backgroundColor: '#111827', borderRadius: '16px', border: '1px solid #1f2937' }}>
+            <h2 style={{ color: '#9ca3af' }}>No hay órdenes pendientes en este momento.</h2>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '2rem' }}>
+            {ordenesTaller.map(item => {
+              const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+              return (
+                <div key={item.id} style={{ backgroundColor: '#111827', borderRadius: '20px', border: '2px solid #374151', padding: '1.8rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1f2937', paddingBottom: '1rem' }}>
+                    <div>
+                      <span style={{ color: '#f97316', fontWeight: '900', fontSize: '1.8rem' }}>N° {nroStr}</span>
+                      <h2 style={{ margin: '4px 0 0 0', color: 'white', fontSize: '1.5rem' }}>{item.cliente}</h2>
+                    </div>
+                    <button
+                      onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')}
+                      style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '12px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      📍 {item.estado || 'Pendiente'} ➔
+                    </button>
+                  </div>
+
+                  <div style={{ backgroundColor: '#030712', padding: '1.2rem', borderRadius: '12px', border: '1px dashed #38bdf8', textAlign: 'center' }}>
+                    <div style={{ color: '#ef4444', fontSize: '2.5rem', fontWeight: '900' }}>
+                      {item.ancho || 0} x {item.alto || 0} <span style={{ fontSize: '1.2rem' }}>cm</span>
+                    </div>
+                    <div style={{ color: '#e5e7eb', fontSize: '1.2rem', fontWeight: 'bold', marginTop: '4px' }}>
+                      {item.cantidad || 1} un. — {item.material}
+                    </div>
+                  </div>
+
+                  <div style={{ color: '#d1d5db', fontSize: '1rem', backgroundColor: '#1f2937', padding: '12px', borderRadius: '8px' }}>
+                    <b>Detalle:</b> {item.descripcion}
+                  </div>
+
+                  {item.imagen_archivo && (
+                    <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '12px', padding: '10px', border: '1px solid #374151' }}>
+                      <span style={{ color: '#9ca3af', fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>BOCETO / PREVIA DE DISEÑO:</span>
+                      <img src={item.imagen_archivo} alt="Boceto Taller" style={{ width: '100%', height: '220px', objectFit: 'contain', borderRadius: '8px' }} />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1f2937', padding: '10px 14px', borderRadius: '10px' }}>
+                    <span style={{ color: '#9ca3af' }}>Asignado a:</span>
+                    <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1.1rem' }}>👤 {item.operador || 'Operador 1'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   }
 
+  // ==========================================
+  // PORTAL ADMINISTRATIVO DE CONTROL (USUARIO)
+  // ==========================================
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* ENCABEZADO Y NAVEGACIÓN */}
         <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)' }}>
-          <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-            <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
-            <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal Interno de Control, Cotización y Operación de Taller</span>
+          <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
+              <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal de Control Administrativo del Taller</span>
+            </div>
+            {/* BOTÓN PARA ABRIR LA PANTALLA DE TALLER EN OTRA PESTAÑA */}
+            <a 
+              href="?vista=taller" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ backgroundColor: '#15803d', color: 'white', padding: '10px 18px', borderRadius: '10px', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.9rem', border: '1px solid #22c55e' }}
+            >
+              📺 Abrir Pantalla de Taller (Modo TV)
+            </a>
           </div>
 
           <div style={{ display: 'flex', gap: '0.8rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
-            
             <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
@@ -889,96 +596,22 @@ export default function App() {
               <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: 'bold' }}>CAJA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>7. Finanzas</div>
             </div>
-
-            {/* PESTAÑA MODO TV PARA PANTALLA EN TALLER */}
-            <div onClick={() => setVistaActiva('modo_tv')} style={{ flex: '1 1 0px', minWidth: '160px', backgroundColor: '#15803d', border: '2px solid #22c55e', padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#bbf7d0', fontWeight: 'bold' }}>VISTA TV</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>📺 Pantalla Taller</div>
-            </div>
-
           </div>
         </div>
 
-        {/* DASHBOARD FINANCIERO EXCLUSIVO DE FINANZAS */}
-        {vistaActiva === 'egresos' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={generarReportePDF} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                📥 Descargar Reporte Financiero PDF
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ventas Totales</span>
-                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>${totalVentasCobradas.toLocaleString('es-CL')}</div>
-              </div>
-              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Costo Producción</span>
-                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalCostoProduccion.toLocaleString('es-CL')}</div>
-              </div>
-              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Egresos del Taller</span>
-                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalEgresosTaller.toLocaleString('es-CL')}</div>
-              </div>
-              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Utilidad Neta Real</span>
-                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#4ade80', marginTop: '4px' }}>${utilidadNetaReal.toLocaleString('es-CL')}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 1. FORMULARIO DE COTIZACIÓN */}
+        {/* VISTAS ADMINISTRATIVAS */}
         {vistaActiva === 'cotizador' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización Formal</h1>
-            <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
-              Genera una orden interna, presiona <code style={{ backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>Ctrl + V</code> en cualquier parte para pegar una imagen de referencia, y exporta el PDF.
-            </p>
-
+          <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 1.5rem 0' }}>Nueva Cotización / Orden de Taller</h1>
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Empresa *</label>
                   <input type="text" value={empresa} onChange={(e) => setEmpresa(e.target.value)} required placeholder="Nombre de empresa" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Giro</label>
-                  <input type="text" value={giro} onChange={(e) => setGiro(e.target.value)} placeholder="Giro comercial" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>RUT</label>
-                  <input type="text" value={rut} onChange={(e) => setRut(e.target.value)} placeholder="Ej. 76.xxx.xxx-x" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Contacto</label>
-                  <input type="text" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Nombre del contacto" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Dirección</label>
-                  <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Dirección fiscal" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Teléfono WhatsApp</label>
-                  <input type="text" value={telefonoWhatsApp} onChange={(e) => setTelefonoWhatsApp(e.target.value)} placeholder="Ej. 56912345678" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              {/* TIPO DE VENTA / FACTURACIÓN */}
-              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#38bdf8', display: 'block' }}>📄 Régimen Fiscal / Facturación</label>
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Selecciona si el trabajo requiere IVA o es una venta directa sin factura para cuadrar cuentas.</span>
-                </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button type="button" onClick={() => setConFactura(true)} style={{ backgroundColor: conFactura ? '#0284c7' : '#1e293b', color: 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                    Con Factura / Boleta (+19% IVA)
-                  </button>
-                  <button type="button" onClick={() => setConFactura(false)} style={{ backgroundColor: !conFactura ? '#f59e0b' : '#1e293b', color: !conFactura ? '#090d16' : 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                    Sin Factura (Venta Directa)
-                  </button>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Contacto / Teléfono</label>
+                  <input type="text" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Teléfono" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
@@ -986,204 +619,70 @@ export default function App() {
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Producto / Material</label>
                 <select value={materialSeleccionado} onChange={(e) => setMaterialSeleccionado(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box', fontSize: '0.95rem' }}>
                   {Object.keys(preciosMateriales).map((mat) => (
-                    <option key={mat} value={mat}>
-                      {mat} — ${preciosMateriales[mat].toLocaleString('es-CL')} / m²
-                    </option>
+                    <option key={mat} value={mat}>{mat} — ${preciosMateriales[mat].toLocaleString('es-CL')} / m²</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Descripción detallada del ítem</label>
-                <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Impresión y laminado en Trovicel" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Descripción / Observaciones</label>
+                <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Detalles para el taller" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               </div>
 
-              {/* ZONA DE ARRASTRE Y PEGADO CON CTRL+V */}
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imágenes de referencia (opcional)</label>
-                <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop} style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '12px', padding: '2rem', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ fontSize: '2rem' }}>🖼️</div>
-                  <div style={{ fontSize: '0.95rem', color: '#e2e8f0' }}>Arrastra imágenes o presiona <code style={{ color: '#38bdf8' }}>Ctrl + V</code> en cualquier parte</div>
-                  
-                  {imagenArchivo && (
-                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#131c2e', padding: '8px 12px', borderRadius: '8px', border: '1px solid #38bdf8' }}>
-                      <img src={imagenArchivo} alt="Pre-captura" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
-                      <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 'bold' }}>✓ Imagen cargada correctamente</span>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                  <label style={{ backgroundColor: '#1e293b', color: 'white', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', border: '1px solid #334155', display: 'inline-block' }}>
-                    Elegir archivos
-                    <input type="file" accept="image/*" onChange={handleImagenChange} style={{ display: 'none' }} />
-                  </label>
-                </div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imagen de Referencia o Boceto (Pega con Ctrl + V o sube archivo)</label>
+                <input type="file" accept="image/*" onChange={handleImagenChange} style={{ color: 'white' }} />
+                {imagenArchivo && <p style={{ color: '#4ade80', fontSize: '0.85rem' }}>✓ Imagen cargada con éxito</p>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Ancho (cm)</label>
-                  <input type="number" step="0.01" value={ancho} onChange={(e) => setAncho(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                  <input type="number" value={ancho} onChange={(e) => setAncho(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Alto (cm)</label>
-                  <input type="number" step="0.01" value={alto} onChange={(e) => setAlto(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                  <input type="number" value={alto} onChange={(e) => setAlto(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cantidad (Cant.)</label>
-                  <input type="number" min="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#f87171', display: 'block', marginBottom: '0.4rem' }}>Costo Producción ($)</label>
-                  <input type="number" value={costoMaterialBase} onChange={(e) => setCostoMaterialBase(e.target.value)} placeholder="Insumos" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Extras/LED ($)</label>
-                  <input type="number" value={costoExtras} onChange={(e) => setCostoExtras(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Abono Inicial ($)</label>
-                  <input type="number" value={abono} onChange={(e) => setAbono(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '0.4rem' }}>Método de Pago</label>
-                  <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
-                    <option value="Transferencia">Transferencia</option>
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="WebPay">WebPay</option>
-                    <option value="Tarjeta">Tarjeta</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginBottom: '0.4rem' }}>Fecha de Entrega</label>
-                  <input type="date" value={fechaEntregaEstimada} onChange={(e) => setFechaEntregaEstimada(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#a855f7', display: 'block', marginBottom: '0.4rem' }}>Operador Responsable</label>
-                  <input type="text" value={operadorAsignado} onChange={(e) => setOperadorAsignado(e.target.value)} placeholder="Ej. Operador 1" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Neto</span>
-                  <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>${netoFinal.toLocaleString('es-CL')}</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>{conFactura ? 'IVA 19%' : 'Sin Factura'}</span>
-                  <div style={{ fontSize: '1.1rem', color: '#e4e4e7', fontWeight: 'bold' }}>{conFactura ? `$${iva.toLocaleString('es-CL')}` : '$0'}</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ color: '#a1a1aa', fontSize: '0.8rem' }}>Total a Pagar</span>
-                  <div style={{ fontSize: '1.3rem', color: '#38bdf8', fontWeight: 'bold' }}>${totalConIva.toLocaleString('es-CL')} CLP</div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cantidad</label>
+                  <input type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
               <button type="submit" disabled={cargando} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', width: 'fit-content' }}>
-                {cargando ? 'Generando...' : 'Generar y Guardar Cotización Formal'}
+                {cargando ? 'Guardando...' : 'Guardar y Enviar al Taller'}
               </button>
             </form>
-
-            {mensaje && <p style={{ marginTop: '1rem', fontWeight: 'bold', fontSize: '0.9rem', color: mensaje.includes('éxito') ? '#4ade80' : '#f87171' }}>{mensaje}</p>}
+            {mensaje && <p style={{ marginTop: '1rem', fontWeight: 'bold', color: '#4ade80' }}>{mensaje}</p>}
           </div>
         )}
 
-        {/* 2. ORDEN DE TRABAJO */}
         {vistaActiva === 'pendientes' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Órdenes de Trabajo Pendientes</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Listado exclusivo de órdenes de trabajo iniciales o pendientes de confirmación.</p>
-
-            {pendientesTrabajos.length === 0 ? (
-              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>¡Excelente! No hay órdenes de trabajo pendientes en este momento.</p>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-                {pendientesTrabajos.map((item) => renderCardTrabajo(item))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 3. TALLER / KANBAN */}
-        {vistaActiva === 'produccion' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-              <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '1.4rem' }}>🛠️ Tablero de Taller y Fases de Producción</h3>
-              <input type="text" placeholder="🔍 Buscar por empresa, RUT o material..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#f59e0b' }}>📋 Órdenes de Trabajo Pendientes</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
+              {pendientesTrabajos.map(item => renderCardTrabajo(item))}
             </div>
-
-            {cotizaciones.length === 0 ? (
-              <p style={{ color: '#a1a1aa', textAlign: 'center', padding: '2rem' }}>No hay trabajos registrados en el taller.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                <div>
-                  <h4 style={{ color: '#f59e0b', borderBottom: '2px solid #f59e0b', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>⏳ Órdenes Pendientes</span><span>{pendientesTrabajos.length}</span>
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {pendientesTrabajos.map(item => renderCardTrabajo(item))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ color: '#38bdf8', borderBottom: '2px solid #38bdf8', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>🎨 En Diseño</span><span>{trabajosEnDiseno.length}</span>
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {trabajosEnDiseno.map(item => renderCardTrabajo(item))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ color: '#f97316', borderBottom: '2px solid #f97316', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>⚙️ En Corte / Producción</span><span>{trabajosEnProduccion.length}</span>
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {trabajosEnProduccion.map(item => renderCardTrabajo(item))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ color: '#a855f7', borderBottom: '2px solid #a855f7', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>✅ Listo para Entregar</span><span>{trabajosListos.length}</span>
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {trabajosListos.map(item => renderCardTrabajo(item))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ color: '#4ade80', borderBottom: '2px solid #4ade80', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>📦 Entregado</span><span>{trabajosEntregados.length}</span>
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                    {trabajosEntregados.map(item => renderCardTrabajo(item))}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* 4. CRM DE CLIENTES */}
-        {vistaActiva === 'crm' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ margin: 0, color: '#38bdf8', marginBottom: '0.5rem' }}>👥 Directorio de Clientes (CRM)</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Historial y estadísticas de compras de tus clientes recurrentes.</p>
+        {vistaActiva === 'produccion' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>🛠️ Tablero Kanban de Taller</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
+              {cotizaciones.map(item => renderCardTrabajo(item))}
+            </div>
+          </div>
+        )}
 
+        {vistaActiva === 'crm' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>👥 Directorio de Clientes (CRM)</h3>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                  <th style={{ padding: '10px' }}>Empresa / Cliente</th>
-                  <th style={{ padding: '10px' }}>RUT</th>
-                  <th style={{ padding: '10px' }}>Giro</th>
-                  <th style={{ padding: '10px' }}>Contacto</th>
-                  <th style={{ padding: '10px' }}>Trabajos</th>
-                  <th style={{ padding: '10px' }}>Total Histórico</th>
+                  <th style={{ padding: '10px' }}>Empresa</th><th style={{ padding: '10px' }}>RUT</th><th style={{ padding: '10px' }}>Contacto</th><th style={{ padding: '10px' }}>Total Gastado</th>
                 </tr>
               </thead>
               <tbody>
@@ -1191,9 +690,7 @@ export default function App() {
                   <tr key={idx} style={{ borderBottom: '1px solid #334155' }}>
                     <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{cli.empresa}</td>
                     <td style={{ padding: '12px' }}>{cli.rut}</td>
-                    <td style={{ padding: '12px' }}>{cli.giro}</td>
                     <td style={{ padding: '12px' }}>{cli.contacto}</td>
-                    <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 'bold' }}>{cli.cantidadTrabajos}</td>
                     <td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>${cli.totalGastado.toLocaleString('es-CL')}</td>
                   </tr>
                 ))}
@@ -1202,63 +699,36 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. CALENDARIO DE ENTREGAS */}
         {vistaActiva === 'calendario' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ margin: 0, color: '#a855f7', marginBottom: '0.5rem' }}>📅 Calendario y Plazos de Entrega</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Trabajos ordenados cronológicamente por su fecha de entrega programada.</p>
-
-            {cotizaciones.filter(c => c.fecha_entrega).length === 0 ? (
-              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay trabajos con fecha de entrega programada aún.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {cotizaciones.filter(c => c.fecha_entrega).sort((a,b) => new Date(a.fecha_entrega) - new Date(b.fecha_entrega)).map((item) => (
-                  <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div>
-                      <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 'bold' }}>📅 Fecha: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'white', marginTop: '2px' }}>{item.cliente}</div>
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '2px' }}>{item.descripcion}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <span style={{ backgroundColor: '#1e293b', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>{item.estado}</span>
-                      <button onClick={() => generarPDFOperativo(item)} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>PDF Taller</button>
-                    </div>
-                  </div>
-                ))}
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#a855f7' }}>📅 Calendario de Entregas</h3>
+            {cotizaciones.filter(c => c.fecha_entrega).map(item => (
+              <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '8px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <b style={{ color: '#f59e0b' }}>Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</b>
+                  <div style={{ color: 'white' }}>{item.cliente} - {item.descripcion}</div>
+                </div>
+                <span style={{ color: '#38bdf8' }}>{item.estado}</span>
               </div>
-            )}
+            ))}
           </div>
         )}
 
-        {/* 6. INVENTARIO / BODEGA */}
         {vistaActiva === 'inventario' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ margin: 0, color: '#f97316', marginBottom: '0.5rem' }}>📦 Control de Inventario y Bodega</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Stock disponible de planchas, acrílicos y materiales para tu taller.</p>
-
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>📦 Control de Inventario y Bodega</h3>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                  <th style={{ padding: '12px' }}>Material / Insumo</th>
-                  <th style={{ padding: '12px' }}>Stock Actual</th>
-                  <th style={{ padding: '12px' }}>Unidad</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Acciones</th>
+                  <th style={{ padding: '12px' }}>Material</th><th style={{ padding: '12px' }}>Stock</th><th style={{ padding: '12px' }}>Unidad</th>
                 </tr>
               </thead>
               <tbody>
-                {inventario.map((inv) => (
+                {inventario.map(inv => (
                   <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
-                    <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
-                    <td style={{ padding: '14px', color: inv.stock < 5 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>{inv.stock}</td>
-                    <td style={{ padding: '14px', color: '#94a3b8' }}>{inv.unidad}</td>
-                    <td style={{ padding: '14px', textAlign: 'center' }}>
-                      <button onClick={() => {
-                        const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
-                        if (nuevo !== null) {
-                          setInventario(inventario.map(i => i.id === inv.id ? {...i, stock: parseInt(nuevo) || 0} : i));
-                        }
-                      }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
-                    </td>
+                    <td style={{ padding: '12px', color: 'white' }}>{inv.material}</td>
+                    <td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>{inv.stock}</td>
+                    <td style={{ padding: '12px', color: '#94a3b8' }}>{inv.unidad}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1266,73 +736,17 @@ export default function App() {
           </div>
         )}
 
-        {/* 7. EGRESOS Y FINANZAS */}
         {vistaActiva === 'egresos' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#0284c7' }}>Registro de Egresos y Gastos del Taller</h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Filtrar Mes:</label>
-                <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)} style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }}>
-                  <option value="todos">Todos los periodos</option>
-                  <option value="2026-11">Noviembre 2026</option>
-                  <option value="2026-12">Diciembre 2026</option>
-                  <option value="2027-01">Enero 2027</option>
-                </select>
-              </div>
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, color: '#0284c7' }}>Finanzas y Egresos</h3>
+              <button onClick={generarReportePDF} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Descargar Reporte PDF</button>
             </div>
-            
-            <form onSubmit={guardarEgreso} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>Descripción del Gasto: </label>
-                <input type="text" value={descEgreso} onChange={(e) => setDescEgreso(e.target.value)} required placeholder="Ej. Compra planchas acrílico, luz..." style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>Monto ($ CLP): </label>
-                <input type="number" value={montoEgreso} onChange={(e) => setMontoEgreso(e.target.value)} required placeholder="0" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.85rem', color: '#a1a1aa' }}>Categoría: </label>
-                <select value={catEgreso} onChange={(e) => setCatEgreso(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
-                  <option value="Insumos / Materiales">Insumos / Materiales</option>
-                  <option value="Herramientas / Maquinaria">Herramientas / Maquinaria</option>
-                  <option value="Servicios Básicos">Servicios Básicos (Luz/Internet)</option>
-                  <option value="Otros Gastos">Otros Gastos</option>
-                </select>
-              </div>
-              <button type="submit" style={{ padding: '12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Registrar Gasto</button>
+            <form onSubmit={guardarEgreso} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+              <input type="text" value={descEgreso} onChange={(e) => setDescEgreso(e.target.value)} required placeholder="Descripción del gasto" style={{ padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              <input type="number" value={montoEgreso} onChange={(e) => setMontoEgreso(e.target.value)} required placeholder="Monto $" style={{ padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              <button type="submit" style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Registrar Gasto</button>
             </form>
-
-            <h4 style={{ color: '#a1a1aa', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>Historial de Egresos</h4>
-            {egresosFiltrados.length === 0 ? (
-              <p style={{ color: '#a1a1aa', textAlign: 'center' }}>No hay egresos registrados para este periodo.</p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                    <th style={{ padding: '10px' }}>Fecha</th>
-                    <th style={{ padding: '10px' }}>Descripción</th>
-                    <th style={{ padding: '10px' }}>Categoría</th>
-                    <th style={{ padding: '10px' }}>Monto</th>
-                    <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {egresosFiltrados.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
-                      <td style={{ padding: '12px' }}>{new Date(item.created_at).toLocaleDateString('es-CL')}</td>
-                      <td style={{ padding: '12px', fontWeight: 'bold' }}>{item.descripcion}</td>
-                      <td style={{ padding: '12px', color: '#38bdf8' }}>{item.categoria}</td>
-                      <td style={{ padding: '12px', color: '#f87171', fontWeight: 'bold' }}>-${Number(item.monto).toLocaleString('es-CL')}</td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <button onClick={() => eliminarEgreso(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>Eliminar</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </div>
         )}
 
