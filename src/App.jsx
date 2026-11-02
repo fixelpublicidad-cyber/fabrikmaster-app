@@ -9,7 +9,38 @@ export default function App() {
   const [descripcion, setDescripcion] = useState('');
   const [ancho, setAncho] = useState('');
   const [alto, setAlto] = useState('');
-  const [material, setMaterial] = useState('Acrílico');
+  
+  // Catálogo completo basado en las imágenes provistas (Precios por m2)
+  const [materialSeleccionado, setMaterialSeleccionado] = useState('Acrílico 3 mm Blanco');
+  
+  const preciosMateriales = {
+    'Acrílico 3 mm Blanco': 90000,
+    'Acrílico 3 mm Negro': 90000,
+    'Acrílico 3 mm Transparente': 80000,
+    'Acrílico 4 mm Negro': 110000,
+    'Acrílico 4 mm Transparente': 100000,
+    'Acrílico 4 mm + Gráfica': 90000,
+    'Acrílico 4 mm transparente + corte': 75000,
+    'Acrílico Blanco 3 mm': 85000,
+    'Adhesivo impreso sin laminar': 10000,
+    'Adhesivo impreso troquelado Laminado': 18000,
+    'Adhesivo impreso troquelado sin laminar': 15000,
+    'Adhesivo laminado barniz': 14000,
+    'Adhesivo Laminado pvc Brillante': 14000,
+    'Adhesivo Laminado pvc mate': 14000,
+    'Adhesivo Troquelado': 18000,
+    'Aluminio Compuesto 4 mm + Gráfica': 75000,
+    'One Vision': 14000,
+    'Pai 1 mm + Gráfica': 35000,
+    'Panaflex FILM Backligt - Backlite': 16000,
+    'Tela Panaflex': 12000,
+    'Tela PVC': 9000,
+    'Trovicel 3 mm + Gráfica laminado PVC': 32000,
+    'Trovicel 3 mm + Gráfica Sin Laminar': 30000,
+    'Trovicel 5 mm + Gráfica Laminado PVC': 35000,
+    'Trovicel 5 mm + Gráfica Sin laminar': 32000
+  };
+
   const [costoMaterialBase, setCostoMaterialBase] = useState('');
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
@@ -26,12 +57,6 @@ export default function App() {
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [cotizaciones, setCotizaciones] = useState([]);
-
-  const preciosVenta = {
-    'Acrílico': 3.5,
-    'Trovicel': 2.0,
-    'MDF': 1.8
-  };
 
   const cargarDatos = async () => {
     const { data: dataCot, error: errCot } = await supabase
@@ -57,14 +82,17 @@ export default function App() {
     e.preventDefault();
     if (!ancho || !alto || !cliente) return;
 
-    const numAncho = parseFloat(ancho);
-    const numAlto = parseFloat(alto);
+    // Convertir ancho y alto de centímetros a metros para el cálculo por m2
+    const numAnchoMetros = parseFloat(ancho) / 100;
+    const numAltoMetros = parseFloat(alto) / 100;
+    const metrosCuadrados = numAnchoMetros * numAltoMetros;
+
     const extrasVal = parseFloat(costoExtras) || 0;
     const abonoVal = parseFloat(abono) || 0;
     const costoInt = parseFloat(costoMaterialBase) || 0;
     
-    const precioBase = preciosVenta[material] || 2.5;
-    const calculoMaterial = numAncho * numAlto * precioBase;
+    const precioPorM2 = preciosMateriales[materialSeleccionado] || 10000;
+    const calculoMaterial = metrosCuadrados * precioPorM2;
     const precioFinal = Math.round(calculoMaterial + extrasVal);
 
     const utilidadDinero = precioFinal - costoInt;
@@ -81,9 +109,9 @@ export default function App() {
         {
           cliente: cliente,
           descripcion: descripcion || 'Trabajo de taller',
-          ancho: numAncho,
-          alto: numAlto,
-          material: material,
+          ancho: parseFloat(ancho),
+          alto: parseFloat(alto),
+          material: materialSeleccionado,
           extras: extrasVal,
           abono: abonoVal,
           total: precioFinal,
@@ -133,7 +161,6 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
-  // Nuevo flujo de estados solicitado
   const cambiarEstado = async (id, estadoActual) => {
     const estadosPosibles = ['Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'];
     const indiceActual = estadosPosibles.indexOf(estadoActual);
@@ -153,7 +180,6 @@ export default function App() {
   const totalEgresosTaller = listaEgresos.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
 
-  // Colores para cada estado del nuevo flujo
   const getColorEstado = (estado) => {
     switch (estado) {
       case 'Pendiente': return '#94a3b8';
@@ -167,7 +193,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0f172a', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div style={{ maxWidth: '1050px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {/* ENCABEZADO Y NAVEGACIÓN */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#1e293b', padding: '1rem 1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
@@ -212,7 +238,7 @@ export default function App() {
           <>
             {/* FORMULARIO */}
             <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
-              <h3 style={{ marginTop: 0, color: '#38bdf8', marginBottom: '1.5rem' }}>Nueva Cotización y Costo de Producción</h3>
+              <h3 style={{ marginTop: 0, color: '#38bdf8', marginBottom: '1.5rem' }}>Nueva Cotización por m² (Catálogo Fixel)</h3>
               
               <form onSubmit={calcularYGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
@@ -226,26 +252,31 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
                   <div>
                     <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Ancho (cm): </label>
-                    <input type="number" step="0.01" value={ancho} onChange={(e) => setAncho(e.target.value)} required style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                    <input type="number" step="0.01" value={ancho} onChange={(e) => setAncho(e.target.value)} required placeholder="Ej. 100" style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Alto (cm): </label>
-                    <input type="number" step="0.01" value={alto} onChange={(e) => setAlto(e.target.value)} required style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                    <input type="number" step="0.01" value={alto} onChange={(e) => setAlto(e.target.value)} required placeholder="Ej. 50" style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                   </div>
-                  <div>
-                    <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Material: </label>
-                    <select value={material} onChange={(e) => setMaterial(e.target.value)} style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
-                      <option value="Acrílico">Acrílico</option>
-                      <option value="Trovicel">Trovicel</option>
-                      <option value="MDF">MDF</option>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Material / Opción ($/m²): </label>
+                    <select value={materialSeleccionado} onChange={(e) => setMaterialSeleccionado(e.target.value)} style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
+                      {Object.keys(preciosMateriales).map((mat) => (
+                        <option key={mat} value={mat}>
+                          {mat} (${preciosMateriales[mat].toLocaleString('es-CL')} / m²)
+                        </option>
+                      ))}
                     </select>
                   </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', alignItems: 'end' }}>
                   <div>
                     <label style={{ fontSize: '0.9rem', color: '#f87171' }}>Costo Producción ($): </label>
-                    <input type="number" value={costoMaterialBase} onChange={(e) => setCostoMaterialBase(e.target.value)} placeholder="Insumos/Plancha" style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                    <input type="number" value={costoMaterialBase} onChange={(e) => setCostoMaterialBase(e.target.value)} placeholder="Insumos" style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Extras/LED ($): </label>
@@ -278,13 +309,12 @@ export default function App() {
               {mensaje && <p style={{ marginTop: '1rem', textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem', color: mensaje.includes('éxito') ? '#4ade80' : '#f87171' }}>{mensaje}</p>}
             </div>
 
-            {/* TABLERO DE PRODUCCIÓN CON NUEVOS ESTADOS */}
+            {/* TABLERO DE PRODUCCIÓN */}
             <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: 0, color: '#38bdf8' }}>Historial y Tablero de Producción</h3>
                 <input type="text" placeholder="🔍 Buscar por cliente, material o descripción..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 
-                {/* Filtros rápidos actualizados con el nuevo flujo */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {['TODOS', 'Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'].map((est) => (
                     <button key={est} onClick={() => setFiltroEstado(est)} style={{ backgroundColor: filtroEstado === est ? '#0284c7' : '#0f172a', color: filtroEstado === est ? 'white' : '#94a3b8', border: '1px solid #334155', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
