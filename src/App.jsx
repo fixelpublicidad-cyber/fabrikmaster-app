@@ -60,7 +60,6 @@ export default function App() {
   const [listaEgresos, setListaEgresos] = useState([]);
 
   const [busqueda, setBusqueda] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -323,14 +322,13 @@ export default function App() {
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* ENCABEZADO Y CUADROS DE NAVEGACIÓN EN UNA SOLA LÍNEA HORIZONTAL */}
+        {/* ENCABEZADO Y CUADROS DE NAVEGACIÓN SIEMPRE EN UNA LÍNEA */}
         <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)' }}>
           <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
             <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
             <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal Interno de Control, Cotización y Operación de Taller</span>
           </div>
 
-          {/* CONTENEDOR FLEX PARA MANTENER LAS 4 TARJETAS SIEMPRE LADO A LADO */}
           <div style={{ display: 'flex', gap: '1rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
             
             <div 
@@ -605,29 +603,16 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TABLERO GENERAL DE PRODUCCIÓN */}
+        {/* 3. TABLERO GENERAL DE PRODUCCIÓN (Muestra todos los estados: Pendiente, Diseño, Producción, Listo, Entregado) */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#38bdf8' }}>Tablero y Seguimiento de Taller</h3>
+              <h3 style={{ margin: 0, color: '#38bdf8' }}>Tablero de Taller y Fases de Producción</h3>
               <input type="text" placeholder="🔍 Buscar por empresa, RUT o material..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-              
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {['TODOS', 'Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'].map((est) => (
-                  <button key={est} onClick={() => setFiltroEstado(est)} style={{ backgroundColor: filtroEstado === est ? '#0284c7' : '#090d16', color: filtroEstado === est ? 'white' : '#a1a1aa', border: '1px solid #334155', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                    {est}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            {cotizaciones.filter(item => {
-              const b = busqueda.toLowerCase();
-              const matchB = item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-              const matchE = filtroEstado === 'TODOS' || item.estado === filtroEstado;
-              return matchB && matchE;
-            }).length === 0 ? (
-              <p style={{ color: '#a1a1aa', textAlign: 'center' }}>No se encontraron registros en este estado.</p>
+            {cotizaciones.length === 0 ? (
+              <p style={{ color: '#a1a1aa', textAlign: 'center', padding: '2rem' }}>No hay trabajos registrados en el taller.</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
@@ -637,16 +622,17 @@ export default function App() {
                       <th style={{ padding: '10px' }}>N° Cot. / Empresa</th>
                       <th style={{ padding: '10px' }}>Detalle</th>
                       <th style={{ padding: '10px' }}>Total (IVA Incl.)</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>Estado Taller</th>
+                      <th style={{ padding: '10px', textAlign: 'center' }}>Estado Actual (Clic para avanzar)</th>
                       <th style={{ padding: '10px', textAlign: 'center' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cotizaciones.filter(item => {
                       const b = busqueda.toLowerCase();
-                      return (item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b)) && (filtroEstado === 'TODOS' || item.estado === filtroEstado);
+                      return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
                     }).map((item) => {
                       const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+                      const estadoActual = item.estado || 'Pendiente';
                       return (
                         <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
                           <td style={{ padding: '10px' }}>
@@ -669,8 +655,22 @@ export default function App() {
                             ${Number(item.total).toLocaleString('es-CL')} CLP
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center' }}>
-                            <button onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')} title="Avanzar estado" style={{ backgroundColor: 'transparent', border: `1px solid ${getColorEstado(item.estado)}`, color: getColorEstado(item.estado), padding: '6px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                              {item.estado || 'Pendiente'}
+                            <button 
+                              onClick={() => cambiarEstado(item.id, estadoActual)} 
+                              title="Haz clic para avanzar de fase" 
+                              style={{ 
+                                backgroundColor: 'transparent', 
+                                border: `2px solid ${getColorEstado(estadoActual)}`, 
+                                color: getColorEstado(estadoActual), 
+                                padding: '8px 14px', 
+                                borderRadius: '16px', 
+                                cursor: 'pointer', 
+                                fontSize: '0.8rem', 
+                                fontWeight: 'bold', 
+                                whiteSpace: 'nowrap' 
+                              }}
+                            >
+                              📍 {estadoActual} ➔
                             </button>
                           </td>
                           <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
