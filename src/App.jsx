@@ -53,7 +53,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#0f172a', color: '#fff', fontFamily: 'sans-serif' }}>
       <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '1rem', width: '320px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
-        <h2 style={{ color: '#38bdf8', textAlign: 'center', marginBottom: '1.5rem' }}>Cotizador FabrikMaster OS</h2>
+        <h2 style={{ color: '#38bdf8', textAlign: 'center', marginBottom: '1.5rem' }}>Cotizador Fixel App</h2>
         
         <form onSubmit={calcularYGuardar}>
           <div style={{ marginBottom: '1rem' }}>
