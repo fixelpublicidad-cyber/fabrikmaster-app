@@ -22,6 +22,7 @@ export default function App() {
   const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
   const [imagenArchivo, setImagenArchivo] = useState('');
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('');
+  const [operadorAsignado, setOperadorAsignado] = useState('Sin asignar');
 
   const preciosMateriales = {
     'Acrílico 3 mm Blanco': 90000,
@@ -203,6 +204,8 @@ export default function App() {
           imagen_archivo: imagenArchivo,
           con_factura: conFactura,
           fecha_entrega: fechaEntregaEstimada || null,
+          operador: operadorAsignado,
+          aprobado_cliente: false,
           estado: 'Pendiente'
         },
       ]);
@@ -225,8 +228,9 @@ export default function App() {
       setCostoMaterialBase('');
       setCostoExtras('');
       setAbono('');
-      setImagenArchivo('');
       setFechaEntregaEstimada('');
+      setImagenArchivo('');
+      setOperadorAsignado('Sin asignar');
       setConFactura(true);
     }
   };
@@ -248,6 +252,7 @@ export default function App() {
     setAbono(String(item.abono || ''));
     setFechaEntregaEstimada(item.fecha_entrega || '');
     setImagenArchivo(item.imagen_archivo || '');
+    setOperadorAsignado(item.operador || 'Sin asignar');
     setConFactura(item.con_factura !== false);
     setVistaActiva('cotizador');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -266,6 +271,48 @@ export default function App() {
 
     const { error } = await supabase.from('cotizaciones').update({ abono: nuevoTotalAbonado }).eq('id', id);
     if (!error) cargarDatos();
+  };
+
+  const cambiarOperador = async (id, operadorActual) => {
+    const nuevoOp = prompt('Asignar operador (Ej. Juan, Carlos, Taller General):', operadorActual);
+    if (!nuevoOp) return;
+    const { error } = await supabase.from('cotizaciones').update({ operador: nuevoOp }).eq('id', id);
+    if (!error) cargarDatos();
+  };
+
+  // GENERAR REPORTE FINANCIERO EN PDF
+  const generarReportePDF = () => {
+    const doc = new jsPDF();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(0, 120, 255);
+    doc.text('FIXEL PUBLICIDAD - REPORTE FINANCIERO', 105, 20, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CL')}`, 20, 32);
+
+    doc.text(`• Ventas Totales: $${totalVentasCobradas.toLocaleString('es-CL')} CLP`, 20, 45);
+    doc.text(`• Costo de Producción: -$${totalCostoProduccion.toLocaleString('es-CL')} CLP`, 20, 53);
+    doc.text(`• Egresos del Taller: -$${totalEgresosTaller.toLocaleString('es-CL')} CLP`, 20, 61);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(`• Utilidad Neta Real: $${utilidadNetaReal.toLocaleString('es-CL')} CLP`, 20, 72);
+
+    doc.line(20, 80, 190, 80);
+    doc.text('Listado de Egresos del Periodo:', 20, 90);
+
+    let y = 100;
+    egresosFiltrados.forEach((item, idx) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`${idx + 1}. ${item.descripcion} (${item.categoria}) - \$${Number(item.monto).toLocaleString('es-CL')}`, 20, y);
+      y += 8;
+    });
+
+    doc.save('Reporte_Financiero_Fixel.pdf');
   };
 
   const generarPDFFormal = (item) => {
@@ -354,11 +401,9 @@ export default function App() {
     const fechaIngreso = new Date(item.created_at || Date.now()).toLocaleDateString('es-CL');
     const fechaEntregaTxt = item.fecha_entrega ? new Date(item.fecha_entrega).toLocaleDateString('es-CL') : 'Por definir';
 
-    // MARCO EXTERIOR GENERAL
     doc.setLineWidth(0.5);
     doc.rect(10, 10, 190, 277);
 
-    // ENCABEZADO CON LOGO OFICIAL
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(26);
     doc.setTextColor(0, 120, 255);
@@ -371,22 +416,19 @@ export default function App() {
 
     doc.line(10, 30, 200, 30);
 
-    // DATOS CLIENTE
     doc.setFontSize(9.5);
     doc.text(`Empresa: ${item.cliente || '---'}`, 14, 37);
     doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 37);
-    doc.text(`Solicito: ${item.contacto || '---'}`, 150, 37);
+    doc.text(`Operador: ${item.operador || 'Sin asignar'}`, 150, 37);
 
     doc.line(10, 41, 200, 41);
 
-    // N° OC Y FECHAS
     doc.text(`N°DE OC: ${nroStr}`, 14, 48);
     doc.text(`Fecha de Ingreso: ${fechaIngreso}`, 75, 48);
     doc.text(`Fecha de Entrega: ${fechaEntregaTxt}`, 138, 48);
 
     doc.line(10, 52, 200, 52);
 
-    // IMPRESIÓN
     doc.setFillColor(0, 0, 0);
     doc.rect(10, 52, 32, 8, 'F');
     doc.setTextColor(255, 255, 255);
@@ -413,7 +455,6 @@ export default function App() {
 
     doc.line(10, 60, 200, 60);
 
-    // LAMINADO
     doc.setFillColor(0, 0, 0);
     doc.rect(10, 60, 32, 8, 'F');
     doc.setTextColor(255, 255, 255);
@@ -436,7 +477,6 @@ export default function App() {
 
     doc.line(10, 68, 200, 68);
 
-    // CORTE
     doc.setFillColor(0, 0, 0);
     doc.rect(10, 68, 32, 8, 'F');
     doc.setTextColor(255, 255, 255);
@@ -461,14 +501,12 @@ export default function App() {
 
     doc.line(10, 76, 200, 76);
 
-    // OBSERVACIONES
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.text(`Observaciones: ${item.descripcion || 'Ninguna'}`, 12, 82);
 
     doc.line(10, 86, 200, 86);
 
-    // FRANJA NEGRA ADVERTENCIA
     doc.setFillColor(0, 0, 0);
     doc.rect(10, 86, 190, 7, 'F');
     doc.setTextColor(255, 255, 255);
@@ -476,7 +514,6 @@ export default function App() {
     doc.setFontSize(8);
     doc.text('REVISAR CUIDADOSAMENTE CADA DETALLE DE LOS DISEÑOS E INFORMAR CUALQUIER IRREGULARIDAD O DUDA', 105, 90.5, { align: 'center' });
 
-    // ZONA DE BOCETO / IMAGEN CON MEDIDAS
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(200, 0, 0);
@@ -495,7 +532,6 @@ export default function App() {
       doc.text('Sin imagen de referencia adjunta', 105, 160, { align: 'center' });
     }
 
-    // PIE DE PÁGINA (FIRMAS Y TÉRMINO)
     doc.line(10, 260, 200, 260);
 
     doc.setFont('helvetica', 'normal');
@@ -513,10 +549,9 @@ export default function App() {
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
     const facturaTxt = item.con_factura !== false ? '🧾 *IVA (19% incluido)*' : '📌 *Sin Factura (Venta Directa)*';
     
-    // Enlace de seguimiento en tiempo real simulado para el cliente
     const linkSeguimiento = `https://fixel-manager.web.app/seguimiento/${item.id}`;
 
-    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos el resumen de su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto Total:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n${facturaTxt}\n\n🔍 Puedes revisar el estado de tu letrero en línea aquí:\n${linkSeguimiento}\n\n_Validez: 10 días._ ¡Quedamos atentos!`;
+    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos su Cotización N° *${nroStr}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n${facturaTxt}\n\n🔍 *Estado y Aprobación Digital:* \n${linkSeguimiento}\n\n_Validez: 10 días._ ¡Quedamos atentos!`;
     
     const url = telefono 
       ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}`
@@ -578,6 +613,21 @@ export default function App() {
   const totalEgresosTaller = egresosFiltrados.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
 
+  // Clientes CRM únicos extraídos de las cotizaciones
+  const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
+    const trabajosCliente = cotizaciones.filter(c => c.cliente === nombreEmpresa);
+    const totalGastado = trabajosCliente.reduce((acc, c) => acc + Number(c.total || 0), 0);
+    const ultimoTrabajo = trabajosCliente[0];
+    return {
+      empresa: nombreEmpresa,
+      rut: ultimoTrabajo.rut || '---',
+      giro: ultimoTrabajo.giro || '---',
+      contacto: ultimoTrabajo.contacto || ultimoTrabajo.telefono || '---',
+      cantidadTrabajos: trabajosCliente.length,
+      totalGastado
+    };
+  });
+
   const renderCardTrabajo = (item) => {
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
     const estadoActual = item.estado || 'Pendiente';
@@ -594,6 +644,12 @@ export default function App() {
         <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
         <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
         <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#38bdf8', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
+          <span>👤 Operador: <b>{item.operador || 'Sin asignar'}</b></span>
+          <button onClick={() => cambiarOperador(item.id, item.operador)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar</button>
+        </div>
+
         {item.fecha_entrega && <div style={{ color: '#f59e0b', fontSize: '0.75rem' }}>📅 Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>}
         
         {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
@@ -635,154 +691,79 @@ export default function App() {
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* ENCABEZADO Y CUADROS DE NAVEGACIÓN */}
+        {/* ENCABEZADO Y NAVEGACIÓN */}
         <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)' }}>
           <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
             <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
             <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal Interno de Control, Cotización y Operación de Taller</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
+          <div style={{ display: 'flex', gap: '0.8rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
             
-            <div 
-              onClick={() => setVistaActiva('cotizador')}
-              style={{
-                flex: '1 1 0px',
-                minWidth: '180px',
-                backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a',
-                border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`,
-                padding: '1rem',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: vistaActiva === 'cotizador' ? '#e0f2fe' : '#94a3b8', fontWeight: 'bold', letterSpacing: '0.05em' }}>NUEVA</div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>1. Cotización</div>
+            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
             </div>
 
-            <div 
-              onClick={() => setVistaActiva('pendientes')}
-              style={{
-                flex: '1 1 0px',
-                minWidth: '180px',
-                backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a',
-                border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`,
-                padding: '1rem',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDEN DE TRABAJO</div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                2. Órdenes ({pendientesTrabajos.length})
-              </div>
+            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>ORDEN</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>2. Órdenes ({pendientesTrabajos.length})</div>
             </div>
 
-            <div 
-              onClick={() => setVistaActiva('produccion')}
-              style={{
-                flex: '1 1 0px',
-                minWidth: '180px',
-                backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a',
-                border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`,
-                padding: '1rem',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 'bold', letterSpacing: '0.05em' }}>TALLER / KANBAN</div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                3. Taller ({cotizaciones.length})
-              </div>
+            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>KANBAN</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizaciones.length})</div>
             </div>
 
-            <div 
-              onClick={() => setVistaActiva('calendario')}
-              style={{
-                flex: '1 1 0px',
-                minWidth: '180px',
-                backgroundColor: vistaActiva === 'calendario' ? '#0284c7' : '#0f172a',
-                border: `2px solid ${vistaActiva === 'calendario' ? '#38bdf8' : '#334155'}`,
-                padding: '1rem',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: '#a855f7', fontWeight: 'bold', letterSpacing: '0.05em' }}>AGENDA</div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                4. Calendario Entregas
-              </div>
+            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>4. CRM ({clientesCRM.length})</div>
             </div>
 
-            <div 
-              onClick={() => setVistaActiva('inventario')}
-              style={{
-                flex: '1 1 0px',
-                minWidth: '180px',
-                backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a',
-                border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`,
-                padding: '1rem',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: '#f97316', fontWeight: 'bold', letterSpacing: '0.05em' }}>BODEGA</div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                5. Inventario
-              </div>
+            <div onClick={() => setVistaActiva('calendario')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'calendario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'calendario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>AGENDA</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>5. Calendario</div>
             </div>
 
-            <div 
-              onClick={() => setVistaActiva('egresos')}
-              style={{
-                flex: '1 1 0px',
-                minWidth: '180px',
-                backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a',
-                border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`,
-                padding: '1rem',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: '#f87171', fontWeight: 'bold', letterSpacing: '0.05em' }}>FINANZAS</div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                6. Egresos y Caja
-              </div>
+            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 'bold' }}>BODEGA</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
+            </div>
+
+            <div onClick={() => setVistaActiva('egresos')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: 'bold' }}>CAJA</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>7. Finanzas</div>
             </div>
 
           </div>
         </div>
 
-        {/* DASHBOARD FINANCIERO EXCLUSIVO DE LA PESTAÑA FINANZAS */}
+        {/* DASHBOARD FINANCIERO EXCLUSIVO DE FINANZAS */}
         {vistaActiva === 'egresos' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ventas Totales</span>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>${totalVentasCobradas.toLocaleString('es-CL')}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={generarReportePDF} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                📥 Descargar Reporte Financiero PDF
+              </button>
             </div>
-            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Costo Producción</span>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalCostoProduccion.toLocaleString('es-CL')}</div>
-            </div>
-            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Egresos del Taller</span>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalEgresosTaller.toLocaleString('es-CL')}</div>
-            </div>
-            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Utilidad Neta Real</span>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#4ade80', marginTop: '4px' }}>${utilidadNetaReal.toLocaleString('es-CL')}</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ventas Totales</span>
+                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>${totalVentasCobradas.toLocaleString('es-CL')}</div>
+              </div>
+              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Costo Producción</span>
+                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalCostoProduccion.toLocaleString('es-CL')}</div>
+              </div>
+              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Egresos del Taller</span>
+                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalEgresosTaller.toLocaleString('es-CL')}</div>
+              </div>
+              <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+                <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Utilidad Neta Real</span>
+                <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#4ade80', marginTop: '4px' }}>${utilidadNetaReal.toLocaleString('es-CL')}</div>
+              </div>
             </div>
           </div>
         )}
@@ -831,18 +812,10 @@ export default function App() {
                   <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Selecciona si el trabajo requiere IVA o es una venta directa sin factura para cuadrar cuentas.</span>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button 
-                    type="button" 
-                    onClick={() => setConFactura(true)}
-                    style={{ backgroundColor: conFactura ? '#0284c7' : '#1e293b', color: 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
-                  >
+                  <button type="button" onClick={() => setConFactura(true)} style={{ backgroundColor: conFactura ? '#0284c7' : '#1e293b', color: 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
                     Con Factura / Boleta (+19% IVA)
                   </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setConFactura(false)}
-                    style={{ backgroundColor: !conFactura ? '#f59e0b' : '#1e293b', color: !conFactura ? '#090d16' : 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}
-                  >
+                  <button type="button" onClick={() => setConFactura(false)} style={{ backgroundColor: !conFactura ? '#f59e0b' : '#1e293b', color: !conFactura ? '#090d16' : 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
                     Sin Factura (Venta Directa)
                   </button>
                 </div>
@@ -850,11 +823,7 @@ export default function App() {
 
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Producto / Material</label>
-                <select 
-                  value={materialSeleccionado} 
-                  onChange={(e) => setMaterialSeleccionado(e.target.value)} 
-                  style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box', fontSize: '0.95rem' }}
-                >
+                <select value={materialSeleccionado} onChange={(e) => setMaterialSeleccionado(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box', fontSize: '0.95rem' }}>
                   {Object.keys(preciosMateriales).map((mat) => (
                     <option key={mat} value={mat}>
                       {mat} — ${preciosMateriales[mat].toLocaleString('es-CL')} / m²
@@ -871,25 +840,9 @@ export default function App() {
               {/* ZONA DE ARRASTRE Y PEGADO CON CTRL+V */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imágenes de referencia (opcional)</label>
-                <div 
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={handleDrop}
-                  style={{
-                    backgroundColor: '#090d16',
-                    border: '2px dashed #334155',
-                    borderRadius: '12px',
-                    padding: '2rem',
-                    textAlign: 'center',
-                    color: '#94a3b8',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '0.8rem'
-                  }}
-                >
+                <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop} style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '12px', padding: '2rem', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.8rem' }}>
                   <div style={{ fontSize: '2rem' }}>🖼️</div>
                   <div style={{ fontSize: '0.95rem', color: '#e2e8f0' }}>Arrastra imágenes o presiona <code style={{ color: '#38bdf8' }}>Ctrl + V</code> en cualquier parte</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>También puedes usar el botón de abajo. Pre-captura o boceto de diseño.</div>
                   
                   {imagenArchivo && (
                     <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#131c2e', padding: '8px 12px', borderRadius: '8px', border: '1px solid #38bdf8' }}>
@@ -922,7 +875,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#f87171', display: 'block', marginBottom: '0.4rem' }}>Costo Producción ($)</label>
                   <input type="number" value={costoMaterialBase} onChange={(e) => setCostoMaterialBase(e.target.value)} placeholder="Insumos" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
@@ -948,6 +901,10 @@ export default function App() {
                   <label style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginBottom: '0.4rem' }}>Fecha de Entrega</label>
                   <input type="date" value={fechaEntregaEstimada} onChange={(e) => setFechaEntregaEstimada(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#a855f7', display: 'block', marginBottom: '0.4rem' }}>Operador Responsable</label>
+                  <input type="text" value={operadorAsignado} onChange={(e) => setOperadorAsignado(e.target.value)} placeholder="Ej. Juan / Carlos" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
               </div>
 
               <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '1rem' }}>
@@ -965,11 +922,7 @@ export default function App() {
                 </div>
               </div>
 
-              <button 
-                type="submit" 
-                disabled={cargando}
-                style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', width: 'fit-content' }}
-              >
+              <button type="submit" disabled={cargando} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', width: 'fit-content' }}>
                 {cargando ? 'Generando...' : 'Generar y Guardar Cotización Formal'}
               </button>
             </form>
@@ -982,9 +935,7 @@ export default function App() {
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Órdenes de Trabajo Pendientes</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Listado exclusivo de órdenes de trabajo iniciales o pendientes de confirmación.
-            </p>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Listado exclusivo de órdenes de trabajo iniciales o pendientes de confirmación.</p>
 
             {pendientesTrabajos.length === 0 ? (
               <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>¡Excelente! No hay órdenes de trabajo pendientes en este momento.</p>
@@ -1008,109 +959,93 @@ export default function App() {
               <p style={{ color: '#a1a1aa', textAlign: 'center', padding: '2rem' }}>No hay trabajos registrados en el taller.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                
-                {/* 1. Pendientes */}
                 <div>
                   <h4 style={{ color: '#f59e0b', borderBottom: '2px solid #f59e0b', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>⏳ Órdenes Pendientes</span>
-                    <span style={{ fontSize: '0.85rem', backgroundColor: '#f59e0b22', padding: '2px 8px', borderRadius: '8px' }}>{pendientesTrabajos.length} trabajos</span>
+                    <span>⏳ Órdenes Pendientes</span><span>{pendientesTrabajos.length}</span>
                   </h4>
-                  {pendientesTrabajos.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No hay trabajos pendientes.</p>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                      {pendientesTrabajos.filter(item => {
-                        const b = busqueda.toLowerCase();
-                        return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => renderCardTrabajo(item))}
-                    </div>
-                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    {pendientesTrabajos.map(item => renderCardTrabajo(item))}
+                  </div>
                 </div>
 
-                {/* 2. En Diseño */}
                 <div>
                   <h4 style={{ color: '#38bdf8', borderBottom: '2px solid #38bdf8', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>🎨 En Diseño</span>
-                    <span style={{ fontSize: '0.85rem', backgroundColor: '#38bdf822', padding: '2px 8px', borderRadius: '8px' }}>{trabajosEnDiseno.length} trabajos</span>
+                    <span>🎨 En Diseño</span><span>{trabajosEnDiseno.length}</span>
                   </h4>
-                  {trabajosEnDiseno.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No hay trabajos en diseño.</p>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                      {trabajosEnDiseno.filter(item => {
-                        const b = busqueda.toLowerCase();
-                        return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => renderCardTrabajo(item))}
-                    </div>
-                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    {trabajosEnDiseno.map(item => renderCardTrabajo(item))}
+                  </div>
                 </div>
 
-                {/* 3. En Corte / Producción */}
                 <div>
                   <h4 style={{ color: '#f97316', borderBottom: '2px solid #f97316', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>⚙️ En Corte / Producción</span>
-                    <span style={{ fontSize: '0.85rem', backgroundColor: '#f9731622', padding: '2px 8px', borderRadius: '8px' }}>{trabajosEnProduccion.length} trabajos</span>
+                    <span>⚙️ En Corte / Producción</span><span>{trabajosEnProduccion.length}</span>
                   </h4>
-                  {trabajosEnProduccion.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No hay trabajos en producción.</p>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                      {trabajosEnProduccion.filter(item => {
-                        const b = busqueda.toLowerCase();
-                        return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => renderCardTrabajo(item))}
-                    </div>
-                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    {trabajosEnProduccion.map(item => renderCardTrabajo(item))}
+                  </div>
                 </div>
 
-                {/* 4. Listo para Entregar */}
                 <div>
                   <h4 style={{ color: '#a855f7', borderBottom: '2px solid #a855f7', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>✅ Listo para Entregar</span>
-                    <span style={{ fontSize: '0.85rem', backgroundColor: '#a855f722', padding: '2px 8px', borderRadius: '8px' }}>{trabajosListos.length} trabajos</span>
+                    <span>✅ Listo para Entregar</span><span>{trabajosListos.length}</span>
                   </h4>
-                  {trabajosListos.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No hay trabajos listos.</p>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                      {trabajosListos.filter(item => {
-                        const b = busqueda.toLowerCase();
-                        return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => renderCardTrabajo(item))}
-                    </div>
-                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    {trabajosListos.map(item => renderCardTrabajo(item))}
+                  </div>
                 </div>
 
-                {/* 5. Entregado */}
                 <div>
                   <h4 style={{ color: '#4ade80', borderBottom: '2px solid #4ade80', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>📦 Entregado</span>
-                    <span style={{ fontSize: '0.85rem', backgroundColor: '#4ade8022', padding: '2px 8px', borderRadius: '8px' }}>{trabajosEntregados.length} trabajos</span>
+                    <span>📦 Entregado</span><span>{trabajosEntregados.length}</span>
                   </h4>
-                  {trabajosEntregados.length === 0 ? (
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No hay trabajos entregados.</p>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                      {trabajosEntregados.filter(item => {
-                        const b = busqueda.toLowerCase();
-                        return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => renderCardTrabajo(item))}
-                    </div>
-                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                    {trabajosEntregados.map(item => renderCardTrabajo(item))}
+                  </div>
                 </div>
-
               </div>
             )}
           </div>
         )}
 
-        {/* 4. CALENDARIO DE ENTREGAS */}
+        {/* 4. CRM DE CLIENTES */}
+        {vistaActiva === 'crm' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+            <h3 style={{ margin: 0, color: '#38bdf8', marginBottom: '0.5rem' }}>👥 Directorio de Clientes (CRM)</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Historial y estadísticas de compras de tus clientes recurrentes.</p>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                  <th style={{ padding: '10px' }}>Empresa / Cliente</th>
+                  <th style={{ padding: '10px' }}>RUT</th>
+                  <th style={{ padding: '10px' }}>Giro</th>
+                  <th style={{ padding: '10px' }}>Contacto</th>
+                  <th style={{ padding: '10px' }}>Trabajos</th>
+                  <th style={{ padding: '10px' }}>Total Histórico</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientesCRM.map((cli, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #334155' }}>
+                    <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{cli.empresa}</td>
+                    <td style={{ padding: '12px' }}>{cli.rut}</td>
+                    <td style={{ padding: '12px' }}>{cli.giro}</td>
+                    <td style={{ padding: '12px' }}>{cli.contacto}</td>
+                    <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 'bold' }}>{cli.cantidadTrabajos}</td>
+                    <td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>${cli.totalGastado.toLocaleString('es-CL')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 5. CALENDARIO DE ENTREGAS */}
         {vistaActiva === 'calendario' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h3 style={{ margin: 0, color: '#a855f7', marginBottom: '0.5rem' }}>📅 Calendario y Plazos de Entrega</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Trabajos ordenados cronológicamente por su fecha de entrega programada.
-            </p>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Trabajos ordenados cronológicamente por su fecha de entrega programada.</p>
 
             {cotizaciones.filter(c => c.fecha_entrega).length === 0 ? (
               <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay trabajos con fecha de entrega programada aún.</p>
@@ -1134,13 +1069,11 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. INVENTARIO / BODEGA */}
+        {/* 6. INVENTARIO / BODEGA */}
         {vistaActiva === 'inventario' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h3 style={{ margin: 0, color: '#f97316', marginBottom: '0.5rem' }}>📦 Control de Inventario y Bodega</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Stock disponible de planchas, acrílicos y materiales para tu taller.
-            </p>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Stock disponible de planchas, acrílicos y materiales para tu taller.</p>
 
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
               <thead>
@@ -1172,7 +1105,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 6. EGRESOS Y FINANZAS */}
+        {/* 7. EGRESOS Y FINANZAS */}
         {vistaActiva === 'egresos' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
