@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
 
 function App() {
@@ -43,12 +43,12 @@ function App() {
 
       if (error) {
         console.error('Error detallado de Supabase:', error);
-        setMensaje('Error: ' + (error.message || 'Desconocido'));
+        setMensaje('Error: ' + error.message);
       } else {
         setMensaje('¡Cotización guardada exitosamente!');
       }
     } catch (err) {
-      console.error('Error de red o excepción:', err);
+      console.error('Error de red:', err);
       setMensaje('Error de conexión al guardar.');
     } finally {
       setCargando(false);
