@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 
 export default function App() {
   const [vistaActiva, setVistaActiva] = useState('cotizador');
+  const [categoriaTab, setCategoriaTab] = useState('Productos por medida');
 
   const [cliente, setCliente] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -264,6 +265,32 @@ export default function App() {
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Detalle / Nota</label>
                   <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Letrero vitrina" style={{ width: '100%', padding: '12px', backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
+              </div>
+
+              {/* PESTAÑAS DE CATEGORÍA */}
+              <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#a1a1aa', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                AGREGAR A LA SOLICITUD
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                {['Productos por medida', 'Cajas y exhibidores'].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoriaTab(cat)}
+                    style={{
+                      backgroundColor: categoriaTab === cat ? '#0284c7' : '#27272a',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 18px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
               </div>
 
               <form onSubmit={agregarALaSolicitud} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
