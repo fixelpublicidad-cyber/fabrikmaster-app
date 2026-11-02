@@ -2,6 +2,158 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 
+// --- COMPONENTE INTERNO: PANTALLA DE TALLER (MODO TV / KIOSK) ---
+function PantallaTallerTV({ cotizaciones, cambiarEstado }) {
+  const [filtroOperador, setFiltroOperador] = useState('TODOS');
+  const [tareasCompletes, setTareasCompletes] = useState({});
+
+  const toggleTarea = (id, tarea) => {
+    setTareasCompletes(prev => ({
+      ...prev,
+      [`${id}-${tarea}`]: !prev[`${id}-${tarea}`]
+    }));
+  };
+
+  const ordenesTaller = cotizaciones.filter(c => c.estado !== 'Entregado' && c.estado !== 'Listo');
+
+  const ordenesFiltradas = ordenesTaller.filter(item => {
+    if (filtroOperador === 'TODOS') return true;
+    return (item.operador || 'Operador 1').toUpperCase() === filtroOperador.toUpperCase();
+  });
+
+  return (
+    <div style={{ backgroundColor: '#030712', minHeight: '100vh', padding: '1.5rem', color: '#f9fafb', fontFamily: 'system-ui, sans-serif' }}>
+      
+      {/* ENCABEZADO MODO TV */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: '1.2rem 2rem', borderRadius: '16px', border: '2px solid #1f2937', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '2.4rem', fontWeight: '900', letterSpacing: '-0.025em' }}>
+            FIXEL <span style={{ color: '#f97316', fontSize: '1.6rem', fontWeight: 'bold' }}>• TALLER EN VIVO</span>
+          </h1>
+          <span style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '6px 14px', borderRadius: '9999px', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '10px', height: '10px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block' }}></span>
+            MODO TV / KIOSK
+          </span>
+        </div>
+
+        {/* FILTROS RÁPIDOS POR OPERADOR */}
+        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+          <span style={{ color: '#9ca3af', fontSize: '0.9rem', fontWeight: 'bold' }}>OPERADOR:</span>
+          {['TODOS', 'Operador 1'].map((op) => (
+            <button
+              key={op}
+              onClick={() => setFiltroOperador(op)}
+              style={{
+                backgroundColor: filtroOperador === op ? '#0284c7' : '#1f2937',
+                color: 'white',
+                border: filtroOperador === op ? '2px solid #38bdf8' : '1px solid #374151',
+                padding: '10px 20px',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              {op}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* GRILLA DE ÓRDENES DE TRABAJO */}
+      {ordenesFiltradas.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '5rem', backgroundColor: '#111827', borderRadius: '16px', border: '1px solid #1f2937' }}>
+          <h2 style={{ color: '#9ca3af', margin: 0 }}>¡No hay órdenes activas pendientes en el taller!</h2>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
+          {ordenesFiltradas.map((item) => {
+            const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+            const listaTareas = ['Corte Láser', 'Grabado', 'Neón LED / Eléctrico', 'Ensamblado', 'Limpieza'];
+            
+            return (
+              <div key={item.id} style={{ backgroundColor: '#111827', borderRadius: '20px', border: '2px solid #374151', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                
+                {/* CABECERA CARD */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #1f2937', paddingBottom: '0.8rem' }}>
+                  <div>
+                    <span style={{ color: '#f97316', fontWeight: '900', fontSize: '1.6rem', display: 'block' }}>N° {nroStr}</span>
+                    <h2 style={{ margin: '4px 0 0 0', color: 'white', fontSize: '1.4rem', fontWeight: 'bold' }}>{item.cliente}</h2>
+                  </div>
+                  <button
+                    onClick={() => cambiarEstado(item.id, item.estado || 'Pendiente')}
+                    style={{ backgroundColor: '#0369a1', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    📍 {item.estado || 'Pendiente'} ➔
+                  </button>
+                </div>
+
+                {/* MEDIDAS Y MATERIAL GIGANTES */}
+                <div style={{ backgroundColor: '#030712', padding: '1rem', borderRadius: '12px', border: '1px dashed #38bdf8', textAlign: 'center' }}>
+                  <div style={{ color: '#ef4444', fontSize: '2.2rem', fontWeight: '900', letterSpacing: '0.05em' }}>
+                    {item.ancho || 0} x {item.alto || 0} <span style={{ fontSize: '1.2rem' }}>cm</span>
+                  </div>
+                  <div style={{ color: '#e5e7eb', fontSize: '1.1rem', fontWeight: 'bold', marginTop: '4px' }}>
+                    {item.cantidad || 1} un. — {item.material}
+                  </div>
+                </div>
+
+                {/* OBSERVACIONES Y DESCRIPCIÓN */}
+                <div style={{ color: '#9ca3af', fontSize: '0.95rem', backgroundColor: '#1f2937', padding: '10px', borderRadius: '8px' }}>
+                  <b>Observaciones:</b> {item.descripcion || 'Sin observaciones'}
+                </div>
+
+                {/* IMAGEN / BOCETO */}
+                {item.imagen_archivo && (
+                  <img src={item.imagen_archivo} alt="Boceto Taller" style={{ width: '100%', height: '180px', objectFit: 'contain', backgroundColor: '#000', borderRadius: '10px', border: '1px solid #374151' }} />
+                )}
+
+                {/* CHECKLIST DE TAREAS OPERATIVAS */}
+                <div style={{ marginTop: 'auto', borderTop: '1px solid #1f2937', paddingTop: '0.8rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#9ca3af', fontWeight: 'bold', marginBottom: '0.5rem' }}>PROCESOS DE PRODUCCIÓN:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    {listaTareas.map(tarea => {
+                      const key = `${item.id}-${tarea}`;
+                      const completada = tareasCompletes[key];
+                      return (
+                        <button
+                          key={tarea}
+                          onClick={() => toggleTarea(item.id, tarea)}
+                          style={{
+                            backgroundColor: completada ? '#065f46' : '#1f2937',
+                            color: completada ? '#6ee7b7' : '#d1d5db',
+                            border: `1px solid ${completada ? '#10b981' : '#374151'}`,
+                            padding: '8px',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                        >
+                          {completada ? '✓ ' : '○ '} {tarea}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* OPERADOR ASIGNADO */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1f2937', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#9ca3af' }}>Asignado a:</span>
+                  <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>👤 {item.operador || 'Operador 1'}</span>
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- COMPONENTE PRINCIPAL APP ---
 export default function App() {
   const [vistaActiva, setVistaActiva] = useState('cotizador');
 
@@ -22,7 +174,7 @@ export default function App() {
   const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
   const [imagenArchivo, setImagenArchivo] = useState('');
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('');
-  const [operadorAsignado, setOperadorAsignado] = useState('Sin asignar');
+  const [operadorAsignado, setOperadorAsignado] = useState('Operador 1');
 
   const preciosMateriales = {
     'Acrílico 3 mm Blanco': 90000,
@@ -230,7 +382,7 @@ export default function App() {
       setAbono('');
       setFechaEntregaEstimada('');
       setImagenArchivo('');
-      setOperadorAsignado('Sin asignar');
+      setOperadorAsignado('Operador 1');
       setConFactura(true);
     }
   };
@@ -252,7 +404,7 @@ export default function App() {
     setAbono(String(item.abono || ''));
     setFechaEntregaEstimada(item.fecha_entrega || '');
     setImagenArchivo(item.imagen_archivo || '');
-    setOperadorAsignado(item.operador || 'Sin asignar');
+    setOperadorAsignado(item.operador || 'Operador 1');
     setConFactura(item.con_factura !== false);
     setVistaActiva('cotizador');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -274,13 +426,12 @@ export default function App() {
   };
 
   const cambiarOperador = async (id, operadorActual) => {
-    const nuevoOp = prompt('Asignar operador (Ej. Juan, Carlos, Taller General):', operadorActual);
+    const nuevoOp = prompt('Asignar operador (Ej. Operador 1):', operadorActual);
     if (!nuevoOp) return;
     const { error } = await supabase.from('cotizaciones').update({ operador: nuevoOp }).eq('id', id);
     if (!error) cargarDatos();
   };
 
-  // GENERAR REPORTE FINANCIERO EN PDF
   const generarReportePDF = () => {
     const doc = new jsPDF();
     doc.setFont('helvetica', 'bold');
@@ -419,7 +570,7 @@ export default function App() {
     doc.setFontSize(9.5);
     doc.text(`Empresa: ${item.cliente || '---'}`, 14, 37);
     doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 37);
-    doc.text(`Operador: ${item.operador || 'Sin asignar'}`, 150, 37);
+    doc.text(`Operador: ${item.operador || 'Operador 1'}`, 150, 37);
 
     doc.line(10, 41, 200, 41);
 
@@ -613,7 +764,6 @@ export default function App() {
   const totalEgresosTaller = egresosFiltrados.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
 
-  // Clientes CRM únicos extraídos de las cotizaciones
   const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
     const trabajosCliente = cotizaciones.filter(c => c.cliente === nombreEmpresa);
     const totalGastado = trabajosCliente.reduce((acc, c) => acc + Number(c.total || 0), 0);
@@ -646,7 +796,7 @@ export default function App() {
         <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#38bdf8', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
-          <span>👤 Operador: <b>{item.operador || 'Sin asignar'}</b></span>
+          <span>👤 Operador: <b>{item.operador || 'Operador 1'}</b></span>
           <button onClick={() => cambiarOperador(item.id, item.operador)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar</button>
         </div>
 
@@ -687,6 +837,11 @@ export default function App() {
     );
   };
 
+  // SI SE SELECCIONA EL MODO TV, OCUPA TODA LA PANTALLA SIN MENÚ SUPERIOR
+  if (vistaActiva === 'modo_tv') {
+    return <PantallaTallerTV cotizaciones={cotizaciones} cambiarEstado={cambiarEstado} />;
+  }
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -700,39 +855,45 @@ export default function App() {
 
           <div style={{ display: 'flex', gap: '0.8rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
             
-            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
             </div>
 
-            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>ORDEN</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>2. Órdenes ({pendientesTrabajos.length})</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>2. Órdenes ({pendientesTrabajos.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>KANBAN</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizaciones.length})</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizaciones.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>4. CRM ({clientesCRM.length})</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>4. CRM ({clientesCRM.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('calendario')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'calendario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'calendario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('calendario')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'calendario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'calendario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>AGENDA</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>5. Calendario</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>5. Calendario</div>
             </div>
 
-            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 'bold' }}>BODEGA</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
             </div>
 
-            <div onClick={() => setVistaActiva('egresos')} style={{ flex: '1 1 0px', minWidth: '150px', backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('egresos')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: 'bold' }}>CAJA</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>7. Finanzas</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>7. Finanzas</div>
+            </div>
+
+            {/* PESTAÑA MODO TV PARA PANTALLA EN TALLER */}
+            <div onClick={() => setVistaActiva('modo_tv')} style={{ flex: '1 1 0px', minWidth: '160px', backgroundColor: '#15803d', border: '2px solid #22c55e', padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#bbf7d0', fontWeight: 'bold' }}>VISTA TV</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>📺 Pantalla Taller</div>
             </div>
 
           </div>
@@ -903,7 +1064,7 @@ export default function App() {
                 </div>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#a855f7', display: 'block', marginBottom: '0.4rem' }}>Operador Responsable</label>
-                  <input type="text" value={operadorAsignado} onChange={(e) => setOperadorAsignado(e.target.value)} placeholder="Ej. Juan / Carlos" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                  <input type="text" value={operadorAsignado} onChange={(e) => setOperadorAsignado(e.target.value)} placeholder="Ej. Operador 1" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
