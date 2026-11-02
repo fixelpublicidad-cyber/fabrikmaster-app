@@ -59,7 +59,7 @@ export default function App() {
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
-  const [filtroMes, setFiltroMes] = useState('todos'); // Filtro de mes para finanzas
+  const [filtroMes, setFiltroMes] = useState('todos');
 
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -219,7 +219,6 @@ export default function App() {
     }
   };
 
-  // 3. DUPLICAR COTIZACIÓN
   const duplicarCotizacion = (item) => {
     setEmpresa(item.cliente || '');
     setRut(item.rut || '');
@@ -241,7 +240,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // NUEVO ABONO PARCIAL
   const registrarAbonoAdicional = async (id, abonoActual, totalTrabajo) => {
     const nuevoPagoStr = prompt('Ingrese el monto del nuevo abono o pago parcial ($ CLP):');
     if (!nuevoPagoStr) return;
@@ -257,7 +255,6 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
-  // PDF FORMAL (CLIENTE)
   const generarPDFFormal = (item) => {
     const doc = new jsPDF();
     
@@ -338,45 +335,160 @@ export default function App() {
     doc.save(`Cotizacion_Fixel_${nroStr}.pdf`);
   };
 
-  // 4. PDF OPERATIVO DE TALLER (SIN PRECIOS)
+  // PDF FORMATO ORDEN DE TALLER EXACTO (COMO LA REFERENCIA)
   const generarPDFOperativo = (item) => {
     const doc = new jsPDF();
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    const fechaIngreso = new Date(item.created_at || Date.now()).toLocaleDateString('es-CL');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.setTextColor(249, 115, 22); // Naranja taller
-    doc.text('ORDEN DE TALLER / PRODUCCIÓN', 20, 20);
-
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Trabajo N°: ${nroStr}`, 20, 32);
-    doc.text(`Cliente: ${item.cliente || '---'}`, 20, 40);
-    doc.text(`Fecha de emisión: ${new Date(item.created_at || Date.now()).toLocaleDateString('es-CL')}`, 120, 32);
-    doc.text(`Estado actual: ${item.estado || 'Pendiente'}`, 120, 40);
-
+    // MARCO EXTERIOR GENERAL
     doc.setLineWidth(0.5);
-    doc.line(20, 46, 190, 46);
+    doc.rect(10, 10, 190, 277);
 
+    // ENCABEZADO TALLER (FIXEL)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.text('ESPECIFICACIONES TÉCNICAS', 20, 58);
+    doc.setFontSize(28);
+    doc.setTextColor(0, 0, 0);
+    doc.text('FIXEL', 105, 22, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text('• P U B L I C I D A D •', 105, 27, { align: 'center' });
 
+    // LÍNEA DIVISORIA ENCABEZADO
+    doc.line(10, 32, 200, 32);
+
+    // DATOS CLIENTE
+    doc.setFontSize(10);
+    doc.text(`Empresa: ${item.cliente || '---'}`, 14, 39);
+    doc.text(`Contacto: ${item.contacto || item.telefono || '---'}`, 85, 39);
+    doc.text(`Solicito: ${item.contacto || '---'}`, 150, 39);
+
+    doc.line(10, 43, 200, 43);
+
+    // N° OC Y FECHAS
+    doc.text(`N°DE OC: ${nroStr}`, 14, 50);
+    doc.text(`Fecha de Ingreso: ${fechaIngreso}`, 75, 50);
+    doc.text(`Fecha de Entrega: ____________`, 138, 50);
+
+    doc.line(10, 54, 200, 54);
+
+    // IMPRESIÓN
+    doc.setFillColor(0, 0, 0);
+    doc.rect(10, 54, 32, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Impresión', 12, 60);
+
+    doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.text(`• Material / Producto: ${item.material || '---'}`, 20, 68);
-    doc.text(`• Medidas: Ancho ${item.ancho || 0} cm x Alto ${item.alto || 0} cm`, 20, 76);
-    doc.text(`• Cantidad: ${item.cantidad || 1} unidad(es)`, 20, 84);
-    doc.text(`• Descripción / Observaciones: ${item.descripcion || '---'}`, 20, 92);
+    doc.setFontSize(9);
+    doc.text('ADHESIVO', 46, 60);
+    doc.rect(70, 56, 5, 5);
+
+    doc.text('ONE VISION', 80, 60);
+    doc.rect(104, 56, 5, 5);
+
+    doc.text('TELA PVC', 114, 60);
+    doc.rect(134, 56, 5, 5);
+
+    doc.text('PANAFLEX', 144, 60);
+    doc.rect(168, 56, 5, 5);
+
+    doc.text('BLACKOUT', 174, 60);
+    doc.rect(193, 56, 5, 5); // Ajustado para que quepa bien
+
+    doc.line(10, 62, 200, 62);
+
+    // LAMINADO
+    doc.setFillColor(0, 0, 0);
+    doc.rect(10, 62, 32, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Laminado', 12, 68);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text('PVC MATE', 46, 68);
+    doc.rect(70, 64, 5, 5);
+
+    doc.text('PVC BRILLANTE', 80, 68);
+    doc.rect(114, 64, 5, 5);
+
+    doc.text('TROQUEL', 124, 68);
+    doc.rect(149, 64, 5, 5);
+
+    doc.text('SIN LAMINAR', 155, 68);
+    doc.rect(193, 64, 5, 5);
+
+    doc.line(10, 70, 200, 70);
+
+    // CORTE
+    doc.setFillColor(0, 0, 0);
+    doc.rect(10, 70, 32, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Corte', 12, 76);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text('LASER', 50, 76);
+    doc.rect(70, 72, 5, 5);
+    doc.setFillColor(255, 0, 0); // Casilla roja marcada como en la referencia si es láser
+    doc.rect(71, 73, 3, 3, 'F');
+
+    doc.text('ROUTER', 88, 76);
+    doc.rect(114, 72, 5, 5);
+
+    doc.text('MANUAL', 130, 76);
+    doc.rect(149, 72, 5, 5);
+
+    doc.text('INSTALACION', 159, 76);
+    doc.rect(193, 72, 5, 5);
+
+    doc.line(10, 78, 200, 78);
+
+    // OBSERVACIONES
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(`Observaciones: ${item.descripcion || 'Ninguna'}`, 12, 84);
+
+    doc.line(10, 88, 200, 88);
+
+    // FRANJA NEGRA ADVERTENCIA
+    doc.setFillColor(0, 0, 0);
+    doc.rect(10, 88, 190, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('REVISAR CUIDADOSAMENTE CADA DETALLE DE LOS DISEÑOS E INFORMAR CUALQUIER IRREGULARIDAD O DUDA', 105, 92.5, { align: 'center' });
+
+    // ZONA DE BOCETO / IMAGEN
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(200, 0, 0);
+    doc.text(`${item.ancho || 0}x${item.alto || 0} cm`, 105, 103, { align: 'center' });
 
     if (item.imagen_archivo) {
-      doc.text('• Boceto de Referencia:', 20, 104);
       try {
-        doc.addImage(item.imagen_archivo, 'JPEG', 20, 110, 80, 60);
+        doc.addImage(item.imagen_archivo, 'JPEG', 35, 108, 140, 110);
       } catch (e) {
         console.error(e);
       }
+    } else {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Sin imagen de referencia adjunta', 105, 160, { align: 'center' });
     }
+
+    // PIE DE PÁGINA (FIRMAS Y TÉRMINO)
+    doc.line(10, 260, 200, 260);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text('GUÍA REVISADA POR: _________________________', 14, 270);
+    doc.text('TERMINADO Y REVISADO POR: ___________________', 72, 270);
+    doc.text('FECHA TÉRMINO: ____/____/_______', 142, 270);
 
     doc.save(`Orden_Taller_${nroStr}.pdf`);
   };
@@ -428,7 +540,6 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
-  // 1. FILTRAR EGRESOS POR MES / FECHA
   const egresosFiltrados = listaEgresos.filter(item => {
     if (filtroMes === 'todos') return true;
     const fechaItem = new Date(item.created_at);
@@ -436,14 +547,12 @@ export default function App() {
     return mesAnio === filtroMes;
   });
 
-  // Segmentos de trabajos por estado
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
   const trabajosEnDiseno = cotizaciones.filter(c => c.estado === 'En Diseño');
   const trabajosEnProduccion = cotizaciones.filter(c => c.estado === 'En Corte/Producción');
   const trabajosListos = cotizaciones.filter(c => c.estado === 'Listo');
   const trabajosEntregados = cotizaciones.filter(c => c.estado === 'Entregado');
 
-  // Cálculos financieros
   const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
   const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
   const totalEgresosTaller = egresosFiltrados.reduce((acc, item) => acc + Number(item.monto || 0), 0);
@@ -483,7 +592,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* 2. BOTÓN DE REGISTRAR ABONO PARCIAL */}
         <button onClick={() => registrarAbonoAdicional(item.id, abonoActual, totalTrabajo)} style={{ backgroundColor: '#1e293b', color: '#38bdf8', border: '1px solid #334155', padding: '5px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>
           ➕ Registrar Abono Parcial
         </button>
@@ -928,7 +1036,6 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0, color: '#0284c7' }}>Registro de Egresos y Gastos del Taller</h3>
               
-              {/* 1. Selector de filtro por mes */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Filtrar Mes:</label>
                 <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)} style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }}>
