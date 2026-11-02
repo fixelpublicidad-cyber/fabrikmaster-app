@@ -432,9 +432,9 @@ export default function App() {
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 'bold', letterSpacing: '0.05em' }}>POR APROBAR</div>
+              <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 'bold', letterSpacing: '0.05em' }}>ORDEN DE TRABAJO</div>
               <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                2. Por Aprobar ({pendientesTrabajos.length})
+                2. Orden de Trabajo ({pendientesTrabajos.length})
               </div>
             </div>
 
@@ -681,16 +681,16 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. POR APROBAR (SEGMENTADO Y ORDENADO) */}
+        {/* 2. ORDEN DE TRABAJO */}
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Cotizaciones y Trabajos Pendientes de Aprobación</h3>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Órdenes de Trabajo Pendientes</h3>
             <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Listado exclusivo de cotizaciones pendientes para su seguimiento o confirmación con el cliente.
+              Listado exclusivo de órdenes de trabajo iniciales o pendientes de confirmación.
             </p>
 
             {pendientesTrabajos.length === 0 ? (
-              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>¡Excelente! No hay cotizaciones pendientes en este momento.</p>
+              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>¡Excelente! No hay órdenes de trabajo pendientes en este momento.</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
                 {pendientesTrabajos.map((item) => renderCardTrabajo(item))}
@@ -715,7 +715,7 @@ export default function App() {
                 {/* 1. Pendientes */}
                 <div>
                   <h4 style={{ color: '#f59e0b', borderBottom: '2px solid #f59e0b', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>⏳ Pendientes de Aprobación</span>
+                    <span>⏳ Órdenes Pendientes</span>
                     <span style={{ fontSize: '0.85rem', backgroundColor: '#f59e0b22', padding: '2px 8px', borderRadius: '8px' }}>{pendientesTrabajos.length} trabajos</span>
                   </h4>
                   {pendientesTrabajos.length === 0 ? (
