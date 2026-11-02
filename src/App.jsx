@@ -424,4 +424,22 @@ export default function App() {
                             <button 
                               onClick={() => eliminarCotizacion(item.id)}
                               title="Eliminar"
-                              style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '5px 6px', borderRadius: '
+                              style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '5px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                            >
+                              X
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
