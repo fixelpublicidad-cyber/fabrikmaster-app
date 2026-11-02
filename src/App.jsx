@@ -345,28 +345,46 @@ export default function App() {
     if (!error) cargarDatos();
   };
 
+  // Segmentos de trabajos por estado
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
-  
-  // Trabajos segmentados por fases de taller
   const trabajosEnDiseno = cotizaciones.filter(c => c.estado === 'En Diseño');
   const trabajosEnProduccion = cotizaciones.filter(c => c.estado === 'En Corte/Producción');
   const trabajosListos = cotizaciones.filter(c => c.estado === 'Listo');
   const trabajosEntregados = cotizaciones.filter(c => c.estado === 'Entregado');
 
+  // Cálculos financieros
   const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
   const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
   const totalEgresosTaller = listaEgresos.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
 
-  const getColorEstado = (estado) => {
-    switch (estado) {
-      case 'Pendiente': return '#f59e0b';
-      case 'En Diseño': return '#38bdf8';
-      case 'En Corte/Producción': return '#f97316';
-      case 'Listo': return '#a855f7';
-      case 'Entregado': return '#4ade80';
-      default: return '#94a3b8';
-    }
+  const renderCardTrabajo = (item) => {
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    const estadoActual = item.estado || 'Pendiente';
+    
+    return (
+      <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</span>
+          <button onClick={() => cambiarEstado(item.id, estadoActual)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 {estadoActual} ➔</button>
+        </div>
+        <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
+        <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
+        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
+        
+        {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
+        
+        <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1rem' }}>
+          Total: ${Number(item.total).toLocaleString('es-CL')} CLP
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
+          <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
+          <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
+          <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -416,7 +434,7 @@ export default function App() {
             >
               <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 'bold', letterSpacing: '0.05em' }}>POR APROBAR</div>
               <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                2. Pendientes ({pendientesTrabajos.length})
+                2. Por Aprobar ({pendientesTrabajos.length})
               </div>
             </div>
 
@@ -436,7 +454,7 @@ export default function App() {
             >
               <div style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 'bold', letterSpacing: '0.05em' }}>TALLER / KANBAN</div>
               <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white', marginTop: '4px' }}>
-                3. Tablero ({cotizaciones.length})
+                3. Taller ({cotizaciones.length})
               </div>
             </div>
 
@@ -463,25 +481,27 @@ export default function App() {
           </div>
         </div>
 
-        {/* DASHBOARD FINANCIERO UNIFORMADO */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ventas Totales</span>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>${totalVentasCobradas.toLocaleString('es-CL')}</div>
+        {/* DASHBOARD FINANCIERO EXCLUSIVO DE LA PESTAÑA FINANZAS */}
+        {vistaActiva === 'egresos' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ventas Totales</span>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#38bdf8', marginTop: '4px' }}>${totalVentasCobradas.toLocaleString('es-CL')}</div>
+            </div>
+            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Costo Producción</span>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalCostoProduccion.toLocaleString('es-CL')}</div>
+            </div>
+            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Egresos del Taller</span>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalEgresosTaller.toLocaleString('es-CL')}</div>
+            </div>
+            <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Utilidad Neta Real</span>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#4ade80', marginTop: '4px' }}>${utilidadNetaReal.toLocaleString('es-CL')}</div>
+            </div>
           </div>
-          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Costo Producción</span>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalCostoProduccion.toLocaleString('es-CL')}</div>
-          </div>
-          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Egresos del Taller</span>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#f87171', marginTop: '4px' }}>-${totalEgresosTaller.toLocaleString('es-CL')}</div>
-          </div>
-          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Utilidad Neta Real</span>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#4ade80', marginTop: '4px' }}>${utilidadNetaReal.toLocaleString('es-CL')}</div>
-          </div>
-        </div>
+        )}
 
         {/* 1. FORMULARIO DE COTIZACIÓN */}
         {vistaActiva === 'cotizador' && (
@@ -661,7 +681,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. PESTAÑA DEDICADA DE TRABAJOS PENDIENTES */}
+        {/* 2. POR APROBAR (SEGMENTADO Y ORDENADO) */}
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#f59e0b', fontSize: '1.4rem' }}>📋 Cotizaciones y Trabajos Pendientes de Aprobación</h3>
@@ -673,44 +693,13 @@ export default function App() {
               <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>¡Excelente! No hay cotizaciones pendientes en este momento.</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-                {pendientesTrabajos.map((item) => {
-                  const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-                  return (
-                    <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#38bdf8', fontSize: '1.05rem' }}>N° {nroStr}</span>
-                        <span style={{ backgroundColor: '#f59e0b22', color: '#f59e0b', padding: '3px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>Pendiente</span>
-                      </div>
-                      
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1rem' }}>{item.cliente}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-                        <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px' }}>{item.con_factura !== false ? '📄 Con Factura / IVA' : '📌 Sin Factura (Venta Directa)'}</div>
-                      </div>
-                      
-                      {item.imagen_archivo && (
-                        <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #1e293b' }} />
-                      )}
-
-                      <div style={{ fontWeight: 'bold', color: '#4ade80', fontSize: '1.1rem' }}>
-                        Total: ${Number(item.total).toLocaleString('es-CL')} CLP
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
-                        <button onClick={() => cambiarEstado(item.id, item.estado)} style={{ flex: 1, backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                          Aprobar / Pasar a Diseño
-                        </button>
-                        <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>PDF</button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {pendientesTrabajos.map((item) => renderCardTrabajo(item))}
               </div>
             )}
           </div>
         )}
 
-        {/* 3. TABLERO DE TALLER EN SEGMENTOS TIPO LISTADO POR FASES */}
+        {/* 3. TALLER / KANBAN (SEGMENTADO POR FASES EN LISTADOS SEPARADOS) */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
@@ -723,7 +712,25 @@ export default function App() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                 
-                {/* SEGMENTO: EN DISEÑO */}
+                {/* 1. Pendientes */}
+                <div>
+                  <h4 style={{ color: '#f59e0b', borderBottom: '2px solid #f59e0b', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>⏳ Pendientes de Aprobación</span>
+                    <span style={{ fontSize: '0.85rem', backgroundColor: '#f59e0b22', padding: '2px 8px', borderRadius: '8px' }}>{pendientesTrabajos.length} trabajos</span>
+                  </h4>
+                  {pendientesTrabajos.length === 0 ? (
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic' }}>No hay trabajos pendientes.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                      {pendientesTrabajos.filter(item => {
+                        const b = busqueda.toLowerCase();
+                        return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
+                      }).map((item) => renderCardTrabajo(item))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. En Diseño */}
                 <div>
                   <h4 style={{ color: '#38bdf8', borderBottom: '2px solid #38bdf8', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
                     <span>🎨 En Diseño</span>
@@ -736,30 +743,12 @@ export default function App() {
                       {trabajosEnDiseno.filter(item => {
                         const b = busqueda.toLowerCase();
                         return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => {
-                        const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-                        return (
-                          <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #38bdf8', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</span>
-                              <button onClick={() => cambiarEstado(item.id, item.estado)} style={{ backgroundColor: '#38bdf822', border: '1px solid #38bdf8', color: '#38bdf8', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 En Diseño ➔</button>
-                            </div>
-                            <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
-                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-                            {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
-                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
-                              <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
-                              <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
-                              <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      }).map((item) => renderCardTrabajo(item))}
                     </div>
                   )}
                 </div>
 
-                {/* SEGMENTO: EN CORTE / PRODUCCIÓN */}
+                {/* 3. En Corte / Producción */}
                 <div>
                   <h4 style={{ color: '#f97316', borderBottom: '2px solid #f97316', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
                     <span>⚙️ En Corte / Producción</span>
@@ -772,30 +761,12 @@ export default function App() {
                       {trabajosEnProduccion.filter(item => {
                         const b = busqueda.toLowerCase();
                         return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => {
-                        const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-                        return (
-                          <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #f97316', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 'bold', color: '#f97316' }}>N° {nroStr}</span>
-                              <button onClick={() => cambiarEstado(item.id, item.estado)} style={{ backgroundColor: '#f9731622', border: '1px solid #f97316', color: '#f97316', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 En Producción ➔</button>
-                            </div>
-                            <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
-                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-                            {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
-                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
-                              <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
-                              <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
-                              <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      }).map((item) => renderCardTrabajo(item))}
                     </div>
                   )}
                 </div>
 
-                {/* SEGMENTO: LISTO */}
+                {/* 4. Listo para Entregar */}
                 <div>
                   <h4 style={{ color: '#a855f7', borderBottom: '2px solid #a855f7', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
                     <span>✅ Listo para Entregar</span>
@@ -808,30 +779,12 @@ export default function App() {
                       {trabajosListos.filter(item => {
                         const b = busqueda.toLowerCase();
                         return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => {
-                        const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-                        return (
-                          <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #a855f7', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 'bold', color: '#a855f7' }}>N° {nroStr}</span>
-                              <button onClick={() => cambiarEstado(item.id, item.estado)} style={{ backgroundColor: '#a855f722', border: '1px solid #a855f7', color: '#a855f7', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 Listo ➔</button>
-                            </div>
-                            <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
-                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-                            {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
-                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
-                              <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
-                              <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
-                              <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      }).map((item) => renderCardTrabajo(item))}
                     </div>
                   )}
                 </div>
 
-                {/* SEGMENTO: ENTREGADO */}
+                {/* 5. Entregado */}
                 <div>
                   <h4 style={{ color: '#4ade80', borderBottom: '2px solid #4ade80', paddingBottom: '0.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
                     <span>📦 Entregado</span>
@@ -844,25 +797,7 @@ export default function App() {
                       {trabajosEntregados.filter(item => {
                         const b = busqueda.toLowerCase();
                         return item.cliente?.toLowerCase().includes(b) || item.rut?.toLowerCase().includes(b) || item.descripcion?.toLowerCase().includes(b);
-                      }).map((item) => {
-                        const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-                        return (
-                          <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #4ade80', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: 'bold', color: '#4ade80' }}>N° {nroStr}</span>
-                              <button onClick={() => cambiarEstado(item.id, item.estado)} style={{ backgroundColor: '#4ade8022', border: '1px solid #4ade80', color: '#4ade80', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 Entregado ➔</button>
-                            </div>
-                            <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
-                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-                            {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '6px' }} />}
-                            <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
-                              <button onClick={() => generarPDFFormal(item)} style={{ flex: 1, backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF</button>
-                              <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
-                              <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      }).map((item) => renderCardTrabajo(item))}
                     </div>
                   )}
                 </div>
