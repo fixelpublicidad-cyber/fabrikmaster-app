@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from './supabaseClient';
 
 function App() {
+  const [cliente, setCliente] = useState('');
   const [ancho, setAncho] = useState('');
   const [alto, setAlto] = useState('');
   const [material, setMaterial] = useState('Acrílico');
@@ -17,7 +18,7 @@ function App() {
 
   const calcularYGuardar = async (e) => {
     e.preventDefault();
-    if (!ancho || !alto) return;
+    if (!ancho || !alto || !cliente) return;
 
     const numAncho = parseFloat(ancho);
     const numAlto = parseFloat(alto);
@@ -33,6 +34,7 @@ function App() {
         .from('cotizaciones')
         .insert([
           {
+            cliente: cliente,
             ancho: numAncho,
             alto: numAlto,
             material: material,
@@ -43,12 +45,12 @@ function App() {
 
       if (error) {
         console.error('Error detallado de Supabase:', error);
-        setMensaje('Error: ' + (error.message || 'Desconocido'));
+        setMensaje('Error: ' + error.message);
       } else {
         setMensaje('¡Cotización guardada exitosamente!');
       }
     } catch (err) {
-      console.error('Error de red o excepción:', err);
+      console.error('Error de red:', err);
       setMensaje('Error de conexión al guardar.');
     } finally {
       setCargando(false);
@@ -61,6 +63,18 @@ function App() {
         <h2 style={{ textAlign: 'center', color: '#38bdf8', marginBottom: '1.5rem' }}>Cotizador Fixel</h2>
         
         <form onSubmit={calcularYGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Nombre del Cliente: </label>
+            <input 
+              type="text" 
+              value={cliente} 
+              onChange={(e) => setCliente(e.target.value)} 
+              required 
+              placeholder="Ej. Juan Pérez"
+              style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+            />
+          </div>
+
           <div>
             <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Ancho (cm): </label>
             <input 
