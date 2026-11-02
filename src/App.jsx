@@ -3,6 +3,8 @@ import { supabase } from './supabaseClient';
 import jsPDF from 'jspdf';
 
 export default function App() {
+  const [cliente, setCliente] = useState('');
+  const [descripcion, setDescripcion] = useState('');
   const [ancho, setAncho] = useState('');
   const [alto, setAlto] = useState('');
   const [material, setMaterial] = useState('Acrílico');
@@ -34,7 +36,7 @@ export default function App() {
 
   const calcularYGuardar = async (e) => {
     e.preventDefault();
-    if (!ancho || !alto) return;
+    if (!ancho || !alto || !cliente) return;
 
     const numAncho = parseFloat(ancho);
     const numAlto = parseFloat(alto);
@@ -49,6 +51,8 @@ export default function App() {
       .from('cotizaciones')
       .insert([
         {
+          cliente: cliente,
+          descripcion: descripcion || 'Trabajo de rotulación / corte',
           ancho: numAncho,
           alto: numAlto,
           material: material,
@@ -64,6 +68,11 @@ export default function App() {
     } else {
       setMensaje('¡Cotización guardada exitosamente!');
       cargarHistorial();
+      // Limpiar formulario opcionalmente
+      setCliente('');
+      setDescripcion('');
+      setAncho('');
+      setAlto('');
     }
   };
 
@@ -88,73 +97,108 @@ export default function App() {
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Fecha: ${new Date(item.created_at).toLocaleDateString('es-CL')}`, 20, 35);
-    doc.text(`Material: ${item.material}`, 20, 45);
-    doc.text(`Dimensiones: ${item.ancho} cm x ${item.alto} cm`, 20, 55);
-    doc.text(`Total Estimado: $${Number(item.total).toLocaleString('es-CL')} CLP`, 20, 65);
+    doc.text(`Cliente: ${item.cliente || 'General'}`, 20, 35);
+    doc.text(`Detalle: ${item.descripcion || 'Sin descripción'}`, 20, 45);
+    doc.text(`Fecha: ${new Date(item.created_at).toLocaleDateString('es-CL')}`, 20, 55);
+    doc.text(`Material: ${item.material}`, 20, 65);
+    doc.text(`Dimensiones: ${item.ancho} cm x ${item.alto} cm`, 20, 75);
+    doc.text(`Total Estimado: $${Number(item.total).toLocaleString('es-CL')} CLP`, 20, 85);
 
     doc.setDrawColor(200);
-    doc.line(20, 75, 190, 75);
+    doc.line(20, 95, 190, 95);
 
     doc.setFontSize(10);
-    doc.text('Gracias por su preferencia.', 20, 85);
+    doc.text('Gracias por su preferencia - Fixel Publicidad', 20, 105);
 
-    doc.save(`Cotizacion_Fixel_${item.material}_${item.ancho}x${item.alto}.pdf`);
+    doc.save(`Cotizacion_${item.cliente || 'Fixel'}_${item.material}.pdf`);
+  };
+
+  const enviarWhatsApp = (item) => {
+    const texto = `Hola *${item.cliente}*! 👋 Aquí tienes el resumen de tu cotización en *Fixel Publicidad*:\n\n🛠️ *Trabajo:* ${item.descripcion}\n📐 *Medidas:* ${item.ancho} x ${item.alto} cm\n🧱 *Material:* ${item.material}\n💰 *Total:* \$${Number(item.total).toLocaleString('es-CL')} CLP\n\nQuedamos atentos a tus comentarios. ¡Saludos!`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
   };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0f172a', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div style={{ maxWidth: '850px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
         {/* FORMULARIO DE COTIZACIÓN */}
         <div style={{ backgroundColor: '#1e293b', padding: '2rem', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
           <h2 style={{ textAlign: 'center', color: '#38bdf8', marginTop: 0, marginBottom: '1.5rem' }}>Cotizador Fixel</h2>
           
-          <form onSubmit={calcularYGuardar} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'end' }}>
-            <div>
-              <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Ancho (cm): </label>
-              <input 
-                type="number" 
-                step="0.01" 
-                value={ancho} 
-                onChange={(e) => setAncho(e.target.value)} 
-                required 
-                style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
-              />
+          <form onSubmit={calcularYGuardar} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Cliente / Empresa: </label>
+                <input 
+                  type="text" 
+                  value={cliente} 
+                  onChange={(e) => setCliente(e.target.value)} 
+                  required 
+                  placeholder="Ej. Comercial Juan"
+                  style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Descripción del trabajo: </label>
+                <input 
+                  type="text" 
+                  value={descripcion} 
+                  onChange={(e) => setDescripcion(e.target.value)} 
+                  placeholder="Ej. Letrero LED fachada"
+                  style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+                />
+              </div>
             </div>
 
-            <div>
-              <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Alto (cm): </label>
-              <input 
-                type="number" 
-                step="0.01" 
-                value={alto} 
-                onChange={(e) => setAlto(e.target.value)} 
-                required 
-                style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
-              />
-            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Ancho (cm): </label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={ancho} 
+                  onChange={(e) => setAncho(e.target.value)} 
+                  required 
+                  style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+                />
+              </div>
 
-            <div>
-              <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Material: </label>
-              <select 
-                value={material} 
-                onChange={(e) => setMaterial(e.target.value)}
-                style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+              <div>
+                <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Alto (cm): </label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={alto} 
+                  onChange={(e) => setAlto(e.target.value)} 
+                  required 
+                  style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Material: </label>
+                <select 
+                  value={material} 
+                  onChange={(e) => setMaterial(e.target.value)}
+                  style={{ width: '100%', padding: '10px', marginTop: '4px', backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}
+                >
+                  <option value="Acrílico">Acrílico</option>
+                  <option value="Trovicel">Trovicel</option>
+                  <option value="MDF">MDF</option>
+                </select>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={cargando}
+                style={{ padding: '12px', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
               >
-                <option value="Acrílico">Acrílico</option>
-                <option value="Trovicel">Trovicel</option>
-                <option value="MDF">MDF</option>
-              </select>
+                {cargando ? 'Guardando...' : 'Calcular y Guardar'}
+              </button>
             </div>
-
-            <button 
-              type="submit" 
-              disabled={cargando}
-              style={{ padding: '12px', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              {cargando ? 'Guardando...' : 'Calcular y Guardar'}
-            </button>
           </form>
 
           {total !== null && (
@@ -184,7 +228,8 @@ export default function App() {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>
-                    <th style={{ padding: '10px' }}>Fecha</th>
+                    <th style={{ padding: '10px' }}>Cliente</th>
+                    <th style={{ padding: '10px' }}>Detalle</th>
                     <th style={{ padding: '10px' }}>Medidas</th>
                     <th style={{ padding: '10px' }}>Material</th>
                     <th style={{ padding: '10px' }}>Total</th>
@@ -194,22 +239,32 @@ export default function App() {
                 <tbody>
                   {cotizaciones.map((item) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
-                      <td style={{ padding: '10px' }}>{new Date(item.created_at).toLocaleDateString('es-CL')}</td>
+                      <td style={{ padding: '10px', fontWeight: 'bold' }}>{item.cliente || 'S/N'}</td>
+                      <td style={{ padding: '10px', color: '#cbd5e1' }}>{item.descripcion}</td>
                       <td style={{ padding: '10px' }}>{item.ancho} x {item.alto} cm</td>
                       <td style={{ padding: '10px' }}>{item.material}</td>
                       <td style={{ padding: '10px', fontWeight: 'bold', color: '#38bdf8' }}>${Number(item.total).toLocaleString('es-CL')} CLP</td>
-                      <td style={{ padding: '10px', textAlign: 'center', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                      <td style={{ padding: '10px', textAlign: 'center', display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                        <button 
+                          onClick={() => enviarWhatsApp(item)}
+                          title="Enviar por WhatsApp"
+                          style={{ backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                        >
+                          WApp
+                        </button>
                         <button 
                           onClick={() => descargarPDF(item)}
-                          style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                          title="Descargar PDF"
+                          style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                         >
                           PDF
                         </button>
                         <button 
                           onClick={() => eliminarCotizacion(item.id)}
-                          style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                          title="Eliminar"
+                          style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
                         >
-                          Eliminar
+                          X
                         </button>
                       </td>
                     </tr>
