@@ -25,33 +25,8 @@ export default function App() {
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('');
   const [operadorAsignado, setOperadorAsignado] = useState('Operador 1');
 
-  const preciosMateriales = {
-    'Acrílico 3 mm Blanco': 90000,
-    'Acrílico 3 mm Negro': 90000,
-    'Acrílico 3 mm Transparente': 80000,
-    'Acrílico 4 mm Negro': 110000,
-    'Acrílico 4 mm Transparente': 100000,
-    'Acrílico 4 mm + Gráfica': 90000,
-    'Acrílico 4 mm transparente + corte': 75000,
-    'Acrílico Blanco 3 mm': 85000,
-    'Adhesivo impreso sin laminar': 10000,
-    'Adhesivo impreso troquelado Laminado': 18000,
-    'Adhesivo impreso troquelado sin laminar': 15000,
-    'Adhesivo laminado barniz': 14000,
-    'Adhesivo Laminado pvc Brillante': 14000,
-    'Adhesivo Laminado pvc mate': 14000,
-    'Adhesivo Troquelado': 18000,
-    'Aluminio Compuesto 4 mm + Gráfica': 75000,
-    'One Vision': 14000,
-    'Pai 1 mm + Gráfica': 35000,
-    'Panaflex FILM Backligt - Backlite': 16000,
-    'Tela Panaflex': 12000,
-    'Tela PVC': 9000,
-    'Trovicel 3 mm + Gráfica laminado PVC': 32000,
-    'Trovicel 3 mm + Gráfica Sin Laminar': 30000,
-    'Trovicel 5 mm + Gráfica Laminado PVC': 35000,
-    'Trovicel 5 mm + Gráfica Sin laminar': 32000
-  };
+  // Precios dinámicos cargados desde Supabase
+  const [preciosMateriales, setPreciosMateriales] = useState({});
 
   const [costoMaterialBase, setCostoMaterialBase] = useState('');
   const [costoExtras, setCostoExtras] = useState('');
@@ -87,6 +62,15 @@ export default function App() {
 
     const { data: dataInv } = await supabase.from('inventario').select('*').order('categoria', { ascending: true });
     if (dataInv) setInventario(dataInv);
+
+    const { data: dataPrecios } = await supabase.from('precios_materiales').select('*').order('nombre', { ascending: true });
+    if (dataPrecios && dataPrecios.length > 0) {
+      const mapaPrecios = {};
+      dataPrecios.forEach(p => {
+        mapaPrecios[p.nombre] = p.precio_m2;
+      });
+      setPreciosMateriales(mapaPrecios);
+    }
   };
 
   useEffect(() => {
@@ -101,6 +85,7 @@ export default function App() {
       .channel('cambios-taller')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => cargarDatos())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventario' }, () => cargarDatos())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'precios_materiales' }, () => cargarDatos())
       .subscribe();
 
     return () => {
@@ -255,7 +240,6 @@ export default function App() {
     };
   });
 
-  // Agrupación de inventario por categoría
   const categoriasOrden = ['Neón LED Flex', 'Planchas de Acrílico', 'Planchas de Trovicel', 'Vinilos y Impresión', 'General'];
   const inventarioAgrupado = categoriasOrden.reduce((acc, cat) => {
     acc[cat] = inventario.filter(item => (item.categoria || 'General') === cat);
@@ -362,194 +346,144 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.8rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
-            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
             </div>
 
-            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>ORDEN</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>2. Órdenes ({pendientesTrabajos.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>KANBAN</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizaciones.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>4. CRM ({clientesCRM.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 'bold' }}>BODEGA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
+            </div>
+
+            {/* PESTAÑA PRECIOS */}
+            <div onClick={() => setVistaActiva('precios')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'precios' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'precios' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>TARIFAS</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>8. Precios</div>
             </div>
           </div>
         </div>
 
-        {/* BODEGA E INVENTARIO CON GRUPOS Y CATEGORÍAS */}
-        {vistaActiva === 'inventario' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            
-            {/* Formulario de registro por categorías */}
-            <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>➕ Ingresar Insumo o Material por Categoría</h4>
-              
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                let nombreFinal = nuevoMaterialNombre;
-
-                // Formateo automático según categoría
-                if (nuevoMaterialCategoria === 'Neón LED Flex') {
-                  nombreFinal = `Neón LED Flex ${nuevoMaterialColor || 'Blanco'}`;
-                } else if (nuevoMaterialCategoria === 'Planchas de Acrílico') {
-                  nombreFinal = `Acrílico ${nuevoMaterialEspesor} ${nuevoMaterialColor || 'Transparente'}`;
-                } else if (nuevoMaterialCategoria === 'Planchas de Trovicel') {
-                  nombreFinal = `Trovicel ${nuevoMaterialEspesor} ${nuevoMaterialColor || 'Blanco'}`;
-                }
-
-                if (!nombreFinal || nuevoMaterialStock === '') return;
-
-                const { error } = await supabase.from('inventario').insert([
-                  { 
-                    categoria: nuevoMaterialCategoria, 
-                    material: nombreFinal, 
-                    color: nuevoMaterialColor, 
-                    espesor: nuevoMaterialEspesor,
-                    stock: parseInt(nuevoMaterialStock) || 0, 
-                    unidad: nuevoMaterialCategoria === 'Neón LED Flex' ? 'paquetes (5m)' : 'planchas' 
-                  }
-                ]);
-
-                if (!error) {
-                  setNuevoMaterialNombre('');
-                  setNuevoMaterialColor('');
-                  setNuevoMaterialStock('');
-                  cargarDatos();
-                } else {
-                  alert('Error al ingresar insumo: ' + error.message);
-                }
-              }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
-                
+        {/* 1. COTIZADOR */}
+        {vistaActiva === 'cotizador' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
+            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 1.5rem 0' }}>Nueva Cotización / Orden de Taller</h1>
+            <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px' }}>
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Grupo / Familia</label>
-                  <select 
-                    value={nuevoMaterialCategoria} 
-                    onChange={(e) => {
-                      setNuevoMaterialCategoria(e.target.value);
-                      if (e.target.value === 'Neón LED Flex') setNuevoMaterialUnidad('paquetes (5m)');
-                      else if (e.target.value.includes('Planchas')) setNuevoMaterialUnidad('planchas');
-                      else setNuevoMaterialUnidad('unidades');
-                    }} 
-                    style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}
-                  >
-                    <option value="Neón LED Flex">Neón LED Flex (Paquetes 5m)</option>
-                    <option value="Planchas de Acrílico">Planchas de Acrílico</option>
-                    <option value="Planchas de Trovicel">Planchas de Trovicel</option>
-                    <option value="Vinilos y Impresión">Vinilos e Impresión</option>
-                    <option value="General">Otros Insumos</option>
-                  </select>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Empresa *</label>
+                  <input type="text" value={empresa} onChange={(e) => setEmpresa(e.target.value)} required placeholder="Nombre de empresa" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
-
-                {nuevoMaterialCategoria === 'Neón LED Flex' && (
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Color de Neón</label>
-                    <input type="text" value={nuevoMaterialColor} onChange={(e) => setNuevoMaterialColor(e.target.value)} required placeholder="Ej. Cálido, Azul, Rojo, Rosa" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-                  </div>
-                )}
-
-                {(nuevoMaterialCategoria === 'Planchas de Acrílico' || nuevoMaterialCategoria === 'Planchas de Trovicel') && (
-                  <>
-                    <div>
-                      <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Espesor</label>
-                      <select value={nuevoMaterialEspesor} onChange={(e) => setNuevoMaterialEspesor(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}>
-                        <option value="2mm">2 mm</option>
-                        <option value="3mm">3 mm</option>
-                        <option value="4mm">4 mm</option>
-                        <option value="5mm">5 mm</option>
-                        <option value="10mm">10 mm</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Color / Acabado</label>
-                      <input type="text" value={nuevoMaterialColor} onChange={(e) => setNuevoMaterialColor(e.target.value)} required placeholder="Ej. Blanco, Transparente, Negro" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-                    </div>
-                  </>
-                )}
-
-                {nuevoMaterialCategoria === 'General' && (
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre Insumo</label>
-                    <input type="text" value={nuevoMaterialNombre} onChange={(e) => setNuevoMaterialNombre(e.target.value)} required placeholder="Ej. Transformadores 12V" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-                  </div>
-                )}
-
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Cantidad en Stock</label>
-                  <input type="number" value={nuevoMaterialStock} onChange={(e) => setNuevoMaterialStock(e.target.value)} required placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Contacto / Teléfono</label>
+                  <input type="text" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Teléfono" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
                 </div>
+              </div>
 
-                <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Guardar En Bodega</button>
-              </form>
-            </div>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Producto / Material</label>
+                <select value={materialSeleccionado} onChange={(e) => setMaterialSeleccionado(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box', fontSize: '0.95rem' }}>
+                  {Object.keys(preciosMateriales).map((mat) => (
+                    <option key={mat} value={mat}>{mat} — ${(preciosMateriales[mat] || 0).toLocaleString('es-CL')} / m²</option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Visualización por Categorías */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-              {Object.keys(inventarioAgrupado).map((catName) => {
-                const itemsGroup = inventarioAgrupado[catName];
-                if (itemsGroup.length === 0) return null;
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Descripción / Observaciones</label>
+                <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Detalles para el taller" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+              </div>
 
-                return (
-                  <div key={catName} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b' }}>
-                    <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8', borderBottom: '2px solid #38bdf8', paddingBottom: '0.4rem', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>📦 {catName}</span>
-                      <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>{itemsGroup.length} ítems</span>
-                    </h3>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imagen de Referencia o Boceto (Pega con Ctrl + V o sube archivo)</label>
+                <input type="file" accept="image/*" onChange={handleImagenChange} style={{ color: 'white' }} />
+                {imagenArchivo && <p style={{ color: '#4ade80', fontSize: '0.85rem' }}>✓ Imagen cargada con éxito</p>}
+              </div>
 
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                          <th style={{ padding: '10px' }}>Insumo / Detalle</th>
-                          <th style={{ padding: '10px' }}>Stock Disponible</th>
-                          <th style={{ padding: '10px' }}>Unidad</th>
-                          <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {itemsGroup.map((inv) => (
-                          <tr key={inv.id} style={{ borderBottom: '1px solid #1e293b' }}>
-                            <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
-                            <td style={{ padding: '12px', color: inv.stock < 3 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                              {inv.stock}
-                            </td>
-                            <td style={{ padding: '12px', color: '#94a3b8' }}>{inv.unidad || 'paquetes'}</td>
-                            <td style={{ padding: '12px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                              <button onClick={async () => {
-                                const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
-                                if (nuevo !== null) {
-                                  const { error } = await supabase.from('inventario').update({ stock: parseInt(nuevo) || 0 }).eq('id', inv.id);
-                                  if (!error) cargarDatos();
-                                }
-                              }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
-                              
-                              <button onClick={async () => {
-                                if (confirm(`¿Eliminar ${inv.material}?`)) {
-                                  const { error } = await supabase.from('inventario').delete().eq('id', inv.id);
-                                  if (!error) cargarDatos();
-                                }
-                              }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Ancho (cm)</label>
+                  <input type="number" value={ancho} onChange={(e) => setAncho(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Alto (cm)</label>
+                  <input type="number" value={alto} onChange={(e) => setAlto(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cantidad</label>
+                  <input type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+              </div>
 
+              <button type="submit" disabled={cargando} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', width: 'fit-content' }}>
+                {cargando ? 'Guardando...' : 'Guardar y Enviar al Taller'}
+              </button>
+            </form>
+            {mensaje && <p style={{ marginTop: '1rem', fontWeight: 'bold', color: '#4ade80' }}>{mensaje}</p>}
+          </div>
+        )}
+
+        {/* 8. GESTIÓN DE PRECIOS */}
+        {vistaActiva === 'precios' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <h3 style={{ margin: 0, color: '#a855f7' }}>💲 Gestión de Precios y Tarifas por m²</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '-10px' }}>Modifica los valores unitarios de cada material. Los cambios se aplicarán automáticamente al cotizar.</p>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                  <th style={{ padding: '12px' }}>Producto / Material</th>
+                  <th style={{ padding: '12px' }}>Precio Actual por m² ($ CLP)</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.keys(preciosMateriales).map((mat) => (
+                  <tr key={mat} style={{ borderBottom: '1px solid #1e293b' }}>
+                    <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{mat}</td>
+                    <td style={{ padding: '14px', color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      ${(preciosMateriales[mat] || 0).toLocaleString('es-CL')}
+                    </td>
+                    <td style={{ padding: '14px', textAlign: 'center' }}>
+                      <button onClick={async () => {
+                        const nuevoPrecio = prompt(`Ingrese el nuevo precio por m² para ${mat}:`, preciosMateriales[mat]);
+                        if (nuevoPrecio !== null && !isNaN(nuevoPrecio)) {
+                          const valNum = parseFloat(nuevoPrecio);
+                          // Actualizar en Supabase
+                          const { error } = await supabase
+                            .from('precios_materiales')
+                            .update({ precio_m2: valNum })
+                            .eq('nombre', mat);
+
+                          if (!error) {
+                            cargarDatos();
+                          } else {
+                            // Si no existe el registro exacto por nombre, lo insertamos
+                            await supabase.from('precios_materiales').insert([{ nombre: mat, precio_m2: valNum }]);
+                            cargarDatos();
+                          }
+                        }
+                      }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>Modificar Precio</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
