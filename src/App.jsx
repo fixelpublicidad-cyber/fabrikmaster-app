@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import jsPDF from 'jspdf';
 
 export default function App() {
   const [vistaTallerExclusiva, setVistaTallerExclusiva] = useState(false);
   const [vistaActiva, setVistaActiva] = useState('cotizador');
+
+  // Buscador global
+  const [busquedaGlobal, setBusquedaGlobal] = useState('');
 
   // Datos formales del cliente y fiscales
   const [empresa, setEmpresa] = useState('');
@@ -240,6 +244,64 @@ export default function App() {
     }
   };
 
+  const duplicarOrden = (item) => {
+    setEmpresa(item.cliente || '');
+    setRut(item.rut || '');
+    setDireccion(item.direccion || '');
+    setGiro(item.giro || '');
+    setContacto(item.contacto || '');
+    setTelefonoWhatsApp(item.telefono || '');
+    setMaterialSeleccionado(item.material || Object.keys(preciosMateriales)[0]);
+    setAncho(String(item.ancho || 120));
+    setAlto(String(item.alto || 80));
+    setCantidad(String(item.cantidad || 1));
+    setDescripcion(item.descripcion || '');
+    setImagenArchivo(item.imagen_archivo || '');
+    setOperadorAsignado(item.operador || 'Operador 1');
+    setVistaActiva('cotizador');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const generarPDFOrden = (item) => {
+    const doc = new jsPDF();
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(56, 189, 248);
+    doc.setFontSize(22);
+    doc.text('FIXEL MANAGER', 14, 22);
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Orden de Trabajo N° ${nroStr}`, 150, 22);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.text(`Cliente: ${item.cliente}`, 14, 52);
+    doc.text(`RUT: ${item.rut || '---'}`, 14, 60);
+    doc.text(`Contacto / Tel: ${item.contacto || item.telefono || '---'}`, 14, 68);
+    doc.text(`Fecha Entrega: ${item.fecha_entrega ? new Date(item.fecha_entrega).toLocaleDateString('es-CL') : 'Por definir'}`, 14, 76);
+    doc.text(`Operador Asignado: ${item.operador || 'Operador 1'}`, 14, 84);
+
+    doc.line(14, 92, 196, 92);
+
+    doc.setFontSize(11);
+    doc.text(`Descripción: ${item.descripcion}`, 14, 102);
+    doc.text(`Dimensiones: ${item.ancho} x ${item.alto} cm (${item.cantidad || 1} un.)`, 14, 112);
+    doc.text(`Estado actual: ${item.estado || 'Pendiente'}`, 14, 122);
+    doc.text(`Total a Pagar: $${Number(item.total || 0).toLocaleString('es-CL')} CLP`, 14, 132);
+
+    if (item.imagen_archivo) {
+      try {
+        doc.addImage(item.imagen_archivo, 'JPEG', 14, 142, 80, 60);
+      } catch (e) {
+        // Ignorar si hay error de formato de imagen
+      }
+    }
+
+    doc.save(`Orden_${nroStr}_${item.cliente}.pdf`);
+  };
+
   // Funciones de gestión de tarifas
   const modificarNombreMaterial = async (nombreAntiguo) => {
     const nuevoNombre = prompt(`Ingrese el nuevo nombre para "${nombreAntiguo}":`, nombreAntiguo);
@@ -298,10 +360,18 @@ export default function App() {
     }
   };
 
-  const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
+  // Filtrado general con Buscador Global
+  const cotizacionesFiltradas = cotizaciones.filter(c => {
+    if (!busquedaGlobal) return true;
+    const txt = busquedaGlobal.toLowerCase();
+    const clienteMatch = (c.cliente || '').toLowerCase().includes(txt);
+    const nroMatch = String(c.nro_cotizacion || '').includes(txt);
+    return clienteMatch || nroMatch;
+  });
+
+  const pendientesTrabajos = cotizacionesFiltradas.filter(c => c.estado === 'Pendiente');
   
-  // Filtrado de Historial con rango de fechas opcional
-  const trabajosHistorial = cotizaciones.filter(c => {
+  const trabajosHistorial = cotizacionesFiltradas.filter(c => {
     const esFinalizado = c.estado === 'Listo' || c.estado === 'Entregado';
     if (!esFinalizado) return false;
 
@@ -312,6 +382,8 @@ export default function App() {
     return true;
   });
 
+  const totalVendidoHistorial = trabajosHistorial.reduce((acc, c) => acc + Number(c.total || 0), 0);
+  
   const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
     const trabajosCliente = cotizaciones.filter(c => c.cliente === nombreEmpresa);
     return {
@@ -365,8 +437,10 @@ export default function App() {
           <span>${totalTrabajo.toLocaleString('es-CL')} CLP</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
-          <button onClick={() => eliminarCotizacion(item.id)} style={{ width: '100%', backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>🗑️ Eliminar Orden</button>
+        <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto', flexWrap: 'wrap' }}>
+          <button onClick={() => generarPDFOrden(item)} style={{ flex: '1', backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>📥 PDF</button>
+          <button onClick={() => duplicarOrden(item)} style={{ flex: '1', backgroundColor: '#334155', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>⚡ Duplicar</button>
+          <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
         </div>
       </div>
     );
@@ -455,12 +529,28 @@ export default function App() {
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)' }}>
-          <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
               <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal de Control Administrativo del Taller</span>
             </div>
+            
+            {/* Buscador Global rápido */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#090d16', padding: '6px 12px', borderRadius: '8px', border: '1px solid #334155' }}>
+              <span>🔍</span>
+              <input 
+                type="text" 
+                value={busquedaGlobal} 
+                onChange={(e) => setBusquedaGlobal(e.target.value)} 
+                placeholder="Buscar orden o empresa..." 
+                style={{ backgroundColor: 'transparent', border: 'none', color: 'white', outline: 'none', fontSize: '0.9rem' }}
+              />
+              {busquedaGlobal && (
+                <button onClick={() => setBusquedaGlobal('')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
+              )}
+            </div>
+
             <a 
               href="?vista=taller" 
               target="_blank" 
@@ -484,7 +574,7 @@ export default function App() {
 
             <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>KANBAN</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizaciones.length})</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizacionesFiltradas.length})</div>
             </div>
 
             <div onClick={() => setVistaActiva('historial')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'historial' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'historial' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
@@ -707,24 +797,26 @@ export default function App() {
         {/* 3. KANBAN TALLER */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>🛠️ Tablero Taller y Kanban ({cotizaciones.length})</h3>
-            {cotizaciones.length === 0 ? (
+            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>🛠️ Tablero Taller y Kanban ({cotizacionesFiltradas.length})</h3>
+            {cotizacionesFiltradas.length === 0 ? (
               <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay trabajos en el taller.</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-                {cotizaciones.map(item => renderCardTrabajo(item))}
+                {cotizacionesFiltradas.map(item => renderCardTrabajo(item))}
               </div>
             )}
           </div>
         )}
 
-        {/* 4. HISTORIAL CON FILTRO DE FECHAS */}
+        {/* 4. HISTORIAL CON RESUMEN DE VENTAS Y FILTRO DE FECHAS */}
         {vistaActiva === 'historial' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              <h3 style={{ margin: 0, color: '#38bdf8' }}>📦 Historial de Trabajos Listos y Entregados ({trabajosHistorial.length})</h3>
+              <div>
+                <h3 style={{ margin: 0, color: '#38bdf8' }}>📦 Historial de Trabajos Listos y Entregados ({trabajosHistorial.length})</h3>
+                <span style={{ fontSize: '0.85rem', color: '#4ade80', fontWeight: 'bold' }}>Total ventas en periodo: ${totalVendidoHistorial.toLocaleString('es-CL')} CLP</span>
+              </div>
               
-              {/* Barra de Filtros por Fecha */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', backgroundColor: '#090d16', padding: '8px 12px', borderRadius: '8px', border: '1px solid #334155', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'bold' }}>📅 Filtrar por fecha:</span>
                 <div>
