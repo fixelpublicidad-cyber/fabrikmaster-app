@@ -57,17 +57,11 @@ export default function App() {
   const [nuevoMatNombre, setNuevoMatNombre] = useState('');
   const [nuevoMatPrecio, setNuevoMatPrecio] = useState('');
 
-  const [costoMaterialBase, setCostoMaterialBase] = useState('');
-  const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
   const [metodoPago, setMetodoPago] = useState('Transferencia');
   
   // Egresos e Inventario
-  const [descEgreso, setDescEgreso] = useState('');
-  const [montoEgreso, setMontoEgreso] = useState('');
-  const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
-  
   const [inventario, setInventario] = useState([]);
   const [nuevoMaterialCategoria, setNuevoMaterialCategoria] = useState('Neón LED Flex');
   const [nuevoMaterialNombre, setNuevoMaterialNombre] = useState('');
@@ -150,9 +144,7 @@ export default function App() {
     const precioM2 = preciosMateriales[materialSeleccionado] || 0;
     
     const valorUnitario = Math.round(m2 * precioM2);
-    const netoTotal = valorUnitario * cant;
-    const extrasVal = parseFloat(costoExtras) || 0;
-    const netoFinal = netoTotal + extrasVal;
+    const netoFinal = valorUnitario * cant;
     
     const iva = conFactura ? Math.round(netoFinal * 0.19) : 0;
     const totalConIva = netoFinal + iva;
@@ -170,9 +162,6 @@ export default function App() {
     }
 
     const abonoVal = parseFloat(abono) || 0;
-    const costoInt = parseFloat(costoMaterialBase) || 0;
-    const utilidadDinero = netoFinal - costoInt;
-    const margenPorcentaje = netoFinal > 0 ? Math.round((utilidadDinero / netoFinal) * 100) : 0;
     const nroCotizacion = cotizaciones.length + 5;
 
     setCargando(true);
@@ -198,11 +187,11 @@ export default function App() {
           neto: netoFinal,
           iva: iva,
           total: totalConIva,
-          extras: parseFloat(costoExtras) || 0,
+          extras: 0,
           abono: abonoVal,
           metodo_pago: metodoPago,
-          costo_material: costoInt,
-          margen_utilidad: margenPorcentaje,
+          costo_material: 0,
+          margen_utilidad: 0,
           imagen_archivo: imagenArchivo,
           con_factura: conFactura,
           fecha_entrega: fechaEntregaEstimada || null,
@@ -219,8 +208,8 @@ export default function App() {
       setMensaje(`¡Cotización N° ${String(nroCotizacion).padStart(3, '0')} generada con éxito!`);
       cargarDatos();
       setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
-      setTelefonoWhatsApp(''); setDescripcion(''); setCostoMaterialBase('');
-      setCostoExtras(''); setAbono(''); setFechaEntregaEstimada(''); setImagenArchivo('');
+      setTelefonoWhatsApp(''); setDescripcion(''); setAbono('');
+      setFechaEntregaEstimada(''); setImagenArchivo('');
       setOperadorAsignado('Operador 1'); setConFactura(true);
     }
   };
@@ -254,8 +243,6 @@ export default function App() {
     if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre === nombreAntiguo) return;
 
     const precioActual = preciosMateriales[nombreAntiguo];
-
-    // Eliminar registro viejo e insertar nuevo o actualizar por nombre
     const { error: errDel } = await supabase.from('precios_materiales').delete().eq('nombre', nombreAntiguo);
     const { error: errIns } = await supabase.from('precios_materiales').insert([{ nombre: nuevoNombre.trim(), precio_m2: precioActual }]);
 
@@ -370,18 +357,18 @@ export default function App() {
   };
 
   // ==========================================
-  // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV)
+  // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV) - FILTRADA SOLO EN PRODUCCIÓN
   // ==========================================
   if (vistaTallerExclusiva) {
-    const ordenesTaller = cotizaciones.filter(c => c.estado !== 'Entregado');
+    const ordenesTaller = cotizaciones.filter(c => c.estado === 'En Corte/Producción');
     return (
       <div style={{ backgroundColor: '#030712', minHeight: '100vh', padding: '2rem', color: '#f9fafb', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: '1.5rem 2rem', borderRadius: '16px', border: '2px solid #1f2937', marginBottom: '2rem' }}>
           <div>
             <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '2.6rem', fontWeight: '900' }}>
-              FIXEL <span style={{ color: '#f97316', fontSize: '1.6rem' }}>• PANTALLA DE TALLER EN VIVO</span>
+              FIXEL <span style={{ color: '#f97316', fontSize: '1.6rem' }}>• PANTALLA DE TALLER EN VIVO (PRODUCCIÓN)</span>
             </h1>
-            <p style={{ margin: '5px 0 0 0', color: '#9ca3af', fontSize: '1rem' }}>Actualización automática activada. Solo gestione el estado y visualice los diseños.</p>
+            <p style={{ margin: '5px 0 0 0', color: '#9ca3af', fontSize: '1rem' }}>Mostrando únicamente trabajos activos en maquinaria y corte.</p>
           </div>
           <div style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '10px 20px', borderRadius: '9999px', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ width: '12px', height: '12px', backgroundColor: '#10b981', borderRadius: '50%', display: 'inline-block' }}></span>
@@ -391,7 +378,7 @@ export default function App() {
 
         {ordenesTaller.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '6rem', backgroundColor: '#111827', borderRadius: '16px', border: '1px solid #1f2937' }}>
-            <h2 style={{ color: '#9ca3af' }}>No hay órdenes pendientes en este momento.</h2>
+            <h2 style={{ color: '#9ca3af' }}>No hay trabajos en proceso de corte o producción en este momento.</h2>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '2rem' }}>
@@ -504,7 +491,7 @@ export default function App() {
         {/* 1. COTIZADOR */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización Formal</h1>
+            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Cotización / Orden de trabajo</h1>
             <p style={{ color: '#a1a1aa', fontSize: '0.95rem', marginTop: 0, marginBottom: '1.5rem' }}>
               Genera una orden interna, presiona <code style={{ backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>Ctrl + V</code> para pegar una imagen de referencia.
             </p>
@@ -570,10 +557,53 @@ export default function App() {
                 <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Impresión y laminado en Trovicel" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               </div>
 
+              {/* ZONA INTERACTIVA DE BOCETO / IMAGEN */}
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imagen de referencia o boceto (Sube archivo o pega con Ctrl+V)</label>
-                <input type="file" accept="image/*" onChange={handleImagenChange} style={{ color: 'white' }} />
-                {imagenArchivo && <p style={{ color: '#4ade80', fontSize: '0.85rem' }}>✓ Imagen cargada correctamente</p>}
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imagen de referencia o boceto</label>
+                <div 
+                  onClick={() => document.getElementById('file-input-oculto').click()}
+                  style={{
+                    border: '2px dashed #38bdf8',
+                    backgroundColor: '#090d16',
+                    padding: '1.5rem',
+                    borderRadius: '10px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <input 
+                    id="file-input-oculto" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImagenChange} 
+                    style={{ display: 'none' }} 
+                  />
+                  
+                  {imagenArchivo ? (
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <img src={imagenArchivo} alt="Vista previa boceto" style={{ maxHeight: '160px', maxWidth: '100%', objectFit: 'contain', borderRadius: '6px', border: '1px solid #334155' }} />
+                      <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 'bold' }}>✓ Imagen cargada correctamente (Haz clic o presiona Ctrl+V para cambiar)</span>
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); setImagenArchivo(''); }} 
+                        style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
+                      >
+                        🗑️ Quitar imagen
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: '2rem' }}>🖼️</span>
+                      <span style={{ color: '#f8fafc', fontWeight: 'bold', fontSize: '0.95rem' }}>Haz clic aquí para seleccionar un archivo o arrástralo</span>
+                      <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>También puedes hacer clic en el formulario y presionar <b style={{ color: '#38bdf8' }}>Ctrl + V</b> para pegar una captura</span>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
@@ -591,15 +621,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#f87171', display: 'block', marginBottom: '0.4rem' }}>Costo Producción ($)</label>
-                  <input type="number" value={costoMaterialBase} onChange={(e) => setCostoMaterialBase(e.target.value)} placeholder="Insumos" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Extras/LED ($)</label>
-                  <input type="number" value={costoExtras} onChange={(e) => setCostoExtras(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Abono Inicial ($)</label>
                   <input type="number" value={abono} onChange={(e) => setAbono(e.target.value)} placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
@@ -809,7 +831,6 @@ export default function App() {
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <h3 style={{ margin: 0, color: '#a855f7' }}>💲 Gestión de Precios y Tarifas por m²</h3>
             
-            {/* Formulario para agregar nuevo producto */}
             <form onSubmit={agregarNuevoMaterialTarifa} style={{ display: 'flex', gap: '1rem', backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', flexWrap: 'wrap', alignItems: 'end' }}>
               <div style={{ flex: '2 1 200px' }}>
                 <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre del Material / Producto</label>
