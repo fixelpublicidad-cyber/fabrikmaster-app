@@ -25,7 +25,7 @@ export default function App() {
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('');
   const [operadorAsignado, setOperadorAsignado] = useState('Operador 1');
 
-  // Precios dinámicos cargados desde Supabase
+  // Precios dinámicos
   const [preciosMateriales, setPreciosMateriales] = useState({
     'Acrílico 3 mm Blanco': 90000,
     'Acrílico 3 mm Negro': 90000,
@@ -54,27 +54,27 @@ export default function App() {
     'Trovicel 5 mm + Gráfica Sin laminar': 32000
   });
 
+  const [nuevoMatNombre, setNuevoMatNombre] = useState('');
+  const [nuevoMatPrecio, setNuevoMatPrecio] = useState('');
+
   const [costoMaterialBase, setCostoMaterialBase] = useState('');
   const [costoExtras, setCostoExtras] = useState('');
   const [abono, setAbono] = useState('');
   const [metodoPago, setMetodoPago] = useState('Transferencia');
   
-  // Egresos, Inventario y Filtros
+  // Egresos e Inventario
   const [descEgreso, setDescEgreso] = useState('');
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
   
-  // Inventario agrupado por categorías
   const [inventario, setInventario] = useState([]);
   const [nuevoMaterialCategoria, setNuevoMaterialCategoria] = useState('Neón LED Flex');
   const [nuevoMaterialNombre, setNuevoMaterialNombre] = useState('');
   const [nuevoMaterialColor, setNuevoMaterialColor] = useState('');
   const [nuevoMaterialEspesor, setNuevoMaterialEspesor] = useState('3mm');
   const [nuevoMaterialStock, setNuevoMaterialStock] = useState('');
-  const [nuevoMaterialUnidad, setNuevoMaterialUnidad] = useState('paquetes (5m)');
 
-  const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -92,19 +92,14 @@ export default function App() {
     const { data: dataPrecios } = await supabase.from('precios_materiales').select('*').order('nombre', { ascending: true });
     if (dataPrecios && dataPrecios.length > 0) {
       const mapaPrecios = {};
-      dataPrecios.forEach(p => {
-        mapaPrecios[p.nombre] = p.precio_m2;
-      });
-      setPreciosMateriales(prev => ({ ...prev, ...mapaPrecios }));
+      dataPrecios.forEach(p => { mapaPrecios[p.nombre] = p.precio_m2; });
+      setPreciosMateriales(mapaPrecios);
     }
   };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('vista') === 'taller') {
-      setVistaTallerExclusiva(true);
-    }
-
+    if (params.get('vista') === 'taller') setVistaTallerExclusiva(true);
     cargarDatos();
 
     const canal = supabase
@@ -114,16 +109,13 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'precios_materiales' }, () => cargarDatos())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(canal);
-    };
+    return () => { supabase.removeChannel(canal); };
   }, []);
 
   useEffect(() => {
     const handleGlobalPaste = (e) => {
       const items = e.clipboardData?.items;
       if (!items) return;
-
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
           const blob = items[i].getAsFile();
@@ -134,7 +126,6 @@ export default function App() {
         }
       }
     };
-
     window.addEventListener('paste', handleGlobalPaste);
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, []);
@@ -227,20 +218,10 @@ export default function App() {
     } else {
       setMensaje(`¡Cotización N° ${String(nroCotizacion).padStart(3, '0')} generada con éxito!`);
       cargarDatos();
-      setEmpresa('');
-      setRut('');
-      setDireccion('');
-      setGiro('');
-      setContacto('');
-      setTelefonoWhatsApp('');
-      setDescripcion('');
-      setCostoMaterialBase('');
-      setCostoExtras('');
-      setAbono('');
-      setFechaEntregaEstimada('');
-      setImagenArchivo('');
-      setOperadorAsignado('Operador 1');
-      setConFactura(true);
+      setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
+      setTelefonoWhatsApp(''); setDescripcion(''); setCostoMaterialBase('');
+      setCostoExtras(''); setAbono(''); setFechaEntregaEstimada(''); setImagenArchivo('');
+      setOperadorAsignado('Operador 1'); setConFactura(true);
     }
   };
 
@@ -251,6 +232,80 @@ export default function App() {
 
     const { error } = await supabase.from('cotizaciones').update({ estado: siguienteEstado }).eq('id', id);
     if (!error) cargarDatos();
+  };
+
+  const cambiarOperador = async (id, operadorActual) => {
+    const nuevoOp = prompt('Asignar operador (Ej. Operador 1):', operadorActual);
+    if (!nuevoOp) return;
+    const { error } = await supabase.from('cotizaciones').update({ operador: nuevoOp }).eq('id', id);
+    if (!error) cargarDatos();
+  };
+
+  const eliminarCotizacion = async (id) => {
+    if (confirm('¿Estás seguro de eliminar esta orden?')) {
+      const { error } = await supabase.from('cotizaciones').delete().eq('id', id);
+      if (!error) cargarDatos();
+    }
+  };
+
+  // Funciones de gestión de tarifas
+  const modificarNombreMaterial = async (nombreAntiguo) => {
+    const nuevoNombre = prompt(`Ingrese el nuevo nombre para "${nombreAntiguo}":`, nombreAntiguo);
+    if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre === nombreAntiguo) return;
+
+    const precioActual = preciosMateriales[nombreAntiguo];
+
+    // Eliminar registro viejo e insertar nuevo o actualizar por nombre
+    const { error: errDel } = await supabase.from('precios_materiales').delete().eq('nombre', nombreAntiguo);
+    const { error: errIns } = await supabase.from('precios_materiales').insert([{ nombre: nuevoNombre.trim(), precio_m2: precioActual }]);
+
+    if (!errDel && !errIns) {
+      if (materialSeleccionado === nombreAntiguo) setMaterialSeleccionado(nuevoNombre.trim());
+      cargarDatos();
+    } else {
+      alert('Error al actualizar el nombre en la base de datos.');
+    }
+  };
+
+  const modificarPrecioMaterial = async (nombre) => {
+    const nuevoPrecio = prompt(`Ingrese el nuevo precio por m² para ${nombre}:`, preciosMateriales[nombre]);
+    if (nuevoPrecio !== null && !isNaN(nuevoPrecio)) {
+      const valNum = parseFloat(nuevoPrecio);
+      const { error } = await supabase.from('precios_materiales').update({ precio_m2: valNum }).eq('nombre', nombre);
+      if (error) {
+        await supabase.from('precios_materiales').insert([{ nombre: nombre, precio_m2: valNum }]);
+      }
+      cargarDatos();
+    }
+  };
+
+  const eliminarMaterialTarifa = async (nombre) => {
+    if (confirm(`¿Estás seguro de eliminar "${nombre}" de la lista de tarifas?`)) {
+      const { error } = await supabase.from('precios_materiales').delete().eq('nombre', nombre);
+      if (!error) {
+        setPreciosMateriales(prev => {
+          const copia = { ...prev };
+          delete copia[nombre];
+          return copia;
+        });
+        cargarDatos();
+      }
+    }
+  };
+
+  const agregarNuevoMaterialTarifa = async (e) => {
+    e.preventDefault();
+    if (!nuevoMatNombre || !nuevoMatPrecio) return;
+    const valNum = parseFloat(nuevoMatPrecio) || 0;
+
+    const { error } = await supabase.from('precios_materiales').insert([{ nombre: nuevoMatNombre.trim(), precio_m2: valNum }]);
+    if (!error) {
+      setNuevoMatNombre('');
+      setNuevoMatPrecio('');
+      cargarDatos();
+    } else {
+      alert('Error al guardar el material: ' + error.message);
+    }
   };
 
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
@@ -271,6 +326,48 @@ export default function App() {
     acc[cat] = inventario.filter(item => (item.categoria || 'General') === cat);
     return acc;
   }, {});
+
+  const renderCardTrabajo = (item) => {
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    const estadoActual = item.estado || 'Pendiente';
+    const totalTrabajo = Number(item.total || 0);
+
+    return (
+      <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</span>
+          <button onClick={() => cambiarEstado(item.id, estadoActual)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 {estadoActual} ➔</button>
+        </div>
+        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1.1rem' }}>{item.cliente}</div>
+        <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#38bdf8', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
+          <span>👤 Operador: <b>{item.operador || 'Operador 1'}</b></span>
+          <button onClick={() => cambiarOperador(item.id, item.operador)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar</button>
+        </div>
+
+        {item.fecha_entrega && <div style={{ color: '#f59e0b', fontSize: '0.75rem' }}>📅 Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>}
+        
+        {item.imagen_archivo ? (
+          <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '6px', padding: '4px', border: '1px solid #334155' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.7rem', display: 'block' }}>BOCETO / DISEÑO:</span>
+            <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '130px', objectFit: 'contain', borderRadius: '4px' }} />
+          </div>
+        ) : (
+          <div style={{ color: '#64748b', fontSize: '0.75rem', fontStyle: 'italic', textAlign: 'center' }}>Sin boceto adjunto</div>
+        )}
+        
+        <div style={{ backgroundColor: '#131c2e', padding: '8px', borderRadius: '6px', fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', color: '#4ade80', fontWeight: 'bold' }}>
+          <span>Total:</span>
+          <span>${totalTrabajo.toLocaleString('es-CL')} CLP</span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto' }}>
+          <button onClick={() => eliminarCotizacion(item.id)} style={{ width: '100%', backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>🗑️ Eliminar Orden</button>
+        </div>
+      </div>
+    );
+  };
 
   // ==========================================
   // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV)
@@ -404,7 +501,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* 1. COTIZADOR COMPLETO */}
+        {/* 1. COTIZADOR */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
             <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización Formal</h1>
@@ -554,31 +651,27 @@ export default function App() {
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#f59e0b' }}>📋 Órdenes de Trabajo Pendientes</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-              {pendientesTrabajos.map(item => (
-                <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155' }}>
-                  <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {item.nro_cotizacion || 5}</div>
-                  <div style={{ fontWeight: 'bold', color: 'white', marginTop: '4px' }}>{item.cliente}</div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px' }}>{item.descripcion}</div>
-                </div>
-              ))}
-            </div>
+            {pendientesTrabajos.length === 0 ? (
+              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay órdenes pendientes.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
+                {pendientesTrabajos.map(item => renderCardTrabajo(item))}
+              </div>
+            )}
           </div>
         )}
 
         {/* 3. KANBAN TALLER */}
         {vistaActiva === 'produccion' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>🛠️ Tablero Kanban de Taller ({cotizaciones.length})</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-              {cotizaciones.map(item => (
-                <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155' }}>
-                  <div style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {item.nro_cotizacion || 5} - {item.estado || 'Pendiente'}</div>
-                  <div style={{ fontWeight: 'bold', color: 'white', marginTop: '4px' }}>{item.cliente}</div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px' }}>{item.descripcion}</div>
-                </div>
-              ))}
-            </div>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>🛠️ Tablero Taller y Kanban ({cotizaciones.length})</h3>
+            {cotizaciones.length === 0 ? (
+              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay trabajos en el taller.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
+                {cotizaciones.map(item => renderCardTrabajo(item))}
+              </div>
+            )}
           </div>
         )}
 
@@ -606,7 +699,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 6. BODEGA / INVENTARIO */}
+        {/* 6. BODEGA */}
         {vistaActiva === 'inventario' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
@@ -633,9 +726,7 @@ export default function App() {
                 ]);
 
                 if (!error) {
-                  setNuevoMaterialNombre('');
-                  setNuevoMaterialColor('');
-                  setNuevoMaterialStock('');
+                  setNuevoMaterialNombre(''); setNuevoMaterialColor(''); setNuevoMaterialStock('');
                   cargarDatos();
                 }
               }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
@@ -713,26 +804,51 @@ export default function App() {
           </div>
         )}
 
-        {/* 8. PRECIOS */}
+        {/* 8. PRECIOS / TARIFAS */}
         {vistaActiva === 'precios' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#a855f7' }}>💲 Gestión de Precios y Tarifas por m²</h3>
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <h3 style={{ margin: 0, color: '#a855f7' }}>💲 Gestión de Precios y Tarifas por m²</h3>
+            
+            {/* Formulario para agregar nuevo producto */}
+            <form onSubmit={agregarNuevoMaterialTarifa} style={{ display: 'flex', gap: '1rem', backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', flexWrap: 'wrap', alignItems: 'end' }}>
+              <div style={{ flex: '2 1 200px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre del Material / Producto</label>
+                <input type="text" value={nuevoMatNombre} onChange={(e) => setNuevoMatNombre(e.target.value)} required placeholder="Ej. Acrílico 5 mm Espejo" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ flex: '1 1 120px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Precio m² ($)</label>
+                <input type="number" value={nuevoMatPrecio} onChange={(e) => setNuevoMatPrecio(e.target.value)} required placeholder="95000" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+              </div>
+              <button type="submit" style={{ backgroundColor: '#a855f7', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>
+                ➕ Agregar Producto
+              </button>
+            </form>
+
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                  <th style={{ padding: '12px' }}>Producto / Material</th>
+                  <th style={{ padding: '12px' }}>Precio por m² ($ CLP)</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
               <tbody>
                 {Object.keys(preciosMateriales).map((mat) => (
                   <tr key={mat} style={{ borderBottom: '1px solid #1e293b' }}>
                     <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{mat}</td>
-                    <td style={{ padding: '14px', color: '#4ade80', fontWeight: 'bold' }}>${(preciosMateriales[mat] || 0).toLocaleString('es-CL')}</td>
-                    <td style={{ padding: '14px', textAlign: 'right' }}>
-                      <button onClick={async () => {
-                        const nuevoPrecio = prompt(`Nuevo precio por m² para ${mat}:`, preciosMateriales[mat]);
-                        if (nuevoPrecio !== null && !isNaN(nuevoPrecio)) {
-                          const valNum = parseFloat(nuevoPrecio);
-                          const { error } = await supabase.from('precios_materiales').update({ precio_m2: valNum }).eq('nombre', mat);
-                          if (error) await supabase.from('precios_materiales').insert([{ nombre: mat, precio_m2: valNum }]);
-                          cargarDatos();
-                        }
-                      }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer' }}>Modificar</button>
+                    <td style={{ padding: '14px', color: '#4ade80', fontWeight: 'bold', fontSize: '1.05rem' }}>
+                      ${(preciosMateriales[mat] || 0).toLocaleString('es-CL')}
+                    </td>
+                    <td style={{ padding: '14px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <button onClick={() => modificarNombreMaterial(mat)} style={{ backgroundColor: '#334155', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                        ✏️ Nombre
+                      </button>
+                      <button onClick={() => modificarPrecioMaterial(mat)} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                        💲 Precio
+                      </button>
+                      <button onClick={() => eliminarMaterialTarifa(mat)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                        🗑️
+                      </button>
                     </td>
                   </tr>
                 ))}
