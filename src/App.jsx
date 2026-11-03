@@ -64,11 +64,14 @@ export default function App() {
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
   
-  // Inventario sincronizado con Supabase
+  // Inventario agrupado por categorías
   const [inventario, setInventario] = useState([]);
+  const [nuevoMaterialCategoria, setNuevoMaterialCategoria] = useState('Neón LED Flex');
   const [nuevoMaterialNombre, setNuevoMaterialNombre] = useState('');
+  const [nuevoMaterialColor, setNuevoMaterialColor] = useState('');
+  const [nuevoMaterialEspesor, setNuevoMaterialEspesor] = useState('3mm');
   const [nuevoMaterialStock, setNuevoMaterialStock] = useState('');
-  const [nuevoMaterialUnidad, setNuevoMaterialUnidad] = useState('planchas');
+  const [nuevoMaterialUnidad, setNuevoMaterialUnidad] = useState('paquetes (5m)');
 
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -82,7 +85,7 @@ export default function App() {
     const { data: dataEgr } = await supabase.from('egresos').select('*').order('created_at', { ascending: false });
     if (dataEgr) setListaEgresos(dataEgr);
 
-    const { data: dataInv } = await supabase.from('inventario').select('*').order('material', { ascending: true });
+    const { data: dataInv } = await supabase.from('inventario').select('*').order('categoria', { ascending: true });
     if (dataInv) setInventario(dataInv);
   };
 
@@ -135,11 +138,6 @@ export default function App() {
 
   const handleImagenChange = (e) => {
     if (e.target.files && e.target.files[0]) procesarArchivo(e.target.files[0]);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) procesarArchivo(e.dataTransfer.files[0]);
   };
 
   const calcularValores = () => {
@@ -235,51 +233,6 @@ export default function App() {
     }
   };
 
-  const duplicarCotizacion = (item) => {
-    setEmpresa(item.cliente || '');
-    setRut(item.rut || '');
-    setDireccion(item.direccion || '');
-    setGiro(item.giro || '');
-    setContacto(item.contacto || '');
-    setTelefonoWhatsApp(item.telefono || '');
-    setMaterialSeleccionado(item.material || 'Trovicel 3 mm + Gráfica laminado PVC');
-    setDescripcion(item.descripcion || '');
-    setAncho(String(item.ancho || '120'));
-    setAlto(String(item.alto || '80'));
-    setCantidad(String(item.cantidad || '1'));
-    setCostoMaterialBase(String(item.costo_material || ''));
-    setCostoExtras(String(item.extras || ''));
-    setAbono(String(item.abono || ''));
-    setFechaEntregaEstimada(item.fecha_entrega || '');
-    setImagenArchivo(item.imagen_archivo || '');
-    setOperadorAsignado(item.operador || 'Operador 1');
-    setConFactura(item.con_factura !== false);
-    setVistaActiva('cotizador');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const registrarAbonoAdicional = async (id, abonoActual, totalTrabajo) => {
-    const nuevoPagoStr = prompt('Ingrese el monto del nuevo abono o pago parcial ($ CLP):');
-    if (!nuevoPagoStr) return;
-    const pagoExtra = parseFloat(nuevoPagoStr) || 0;
-    const nuevoTotalAbonado = Number(abonoActual) + pagoExtra;
-
-    if (nuevoTotalAbonado > totalTrabajo) {
-      alert('El abono total no puede superar el monto total del trabajo.');
-      return;
-    }
-
-    const { error } = await supabase.from('cotizaciones').update({ abono: nuevoTotalAbonado }).eq('id', id);
-    if (!error) cargarDatos();
-  };
-
-  const cambiarOperador = async (id, operadorActual) => {
-    const nuevoOp = prompt('Asignar operador (Ej. Operador 1):', operadorActual);
-    if (!nuevoOp) return;
-    const { error } = await supabase.from('cotizaciones').update({ operador: nuevoOp }).eq('id', id);
-    if (!error) cargarDatos();
-  };
-
   const cambiarEstado = async (id, estadoActual) => {
     const estadosPosibles = ['Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'];
     const indiceActual = estadosPosibles.indexOf(estadoActual);
@@ -287,46 +240,6 @@ export default function App() {
 
     const { error } = await supabase.from('cotizaciones').update({ estado: siguienteEstado }).eq('id', id);
     if (!error) cargarDatos();
-  };
-
-  const eliminarCotizacion = async (id) => {
-    const { error } = await supabase.from('cotizaciones').delete().eq('id', id);
-    if (!error) cargarDatos();
-  };
-
-  const generarReportePDF = () => {
-    const doc = new jsPDF();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(0, 120, 255);
-    doc.text('FIXEL PUBLICIDAD - REPORTE FINANCIERO', 105, 20, { align: 'center' });
-    doc.save('Reporte_Financiero_Fixel.pdf');
-  };
-
-  const generarPDFFormal = (item) => {
-    const doc = new jsPDF();
-    doc.save(`Cotizacion_Fixel_${item.nro_cotizacion || 5}.pdf`);
-  };
-
-  const generarPDFOperativo = (item) => {
-    const doc = new jsPDF();
-    doc.save(`Orden_Taller_${item.nro_cotizacion || 5}.pdf`);
-  };
-
-  const enviarWhatsAppFormal = (item) => {
-    const telefono = item.telefono ? item.telefono.replace(/\s+/g, '') : '';
-    const texto = `Hola *${item.cliente}*! 👋 Adjuntamos su Cotización N° *${item.nro_cotizacion || 5}* en *Fixel Publicidad*:\n\n🛠️ *Detalle:* ${item.descripcion}\n💰 *Monto:* \$${Number(item.total).toLocaleString('es-CL')} CLP`;
-    const url = telefono ? `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(texto)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-    window.open(url, '_blank');
-  };
-
-  const guardarEgreso = async (e) => {
-    e.preventDefault();
-    if (!descEgreso || !montoEgreso) return;
-    await supabase.from('egresos').insert([{ descripcion: descEgreso, monto: parseFloat(montoEgreso), categoria: catEgreso }]);
-    setDescEgreso('');
-    setMontoEgreso('');
-    cargarDatos();
   };
 
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
@@ -342,49 +255,12 @@ export default function App() {
     };
   });
 
-  const renderCardTrabajo = (item) => {
-    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
-    const estadoActual = item.estado || 'Pendiente';
-    const abonoActual = Number(item.abono || 0);
-    const totalTrabajo = Number(item.total || 0);
-    
-    return (
-      <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</span>
-          <button onClick={() => cambiarEstado(item.id, estadoActual)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 {estadoActual} ➔</button>
-        </div>
-        <div style={{ fontWeight: 'bold', color: 'white' }}>{item.cliente}</div>
-        <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#38bdf8', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
-          <span>👤 Operador: <b>{item.operador || 'Operador 1'}</b></span>
-          <button onClick={() => cambiarOperador(item.id, item.operador)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar</button>
-        </div>
-
-        {item.fecha_entrega && <div style={{ color: '#f59e0b', fontSize: '0.75rem' }}>📅 Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>}
-        {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }} />}
-        
-        <div style={{ backgroundColor: '#131c2e', padding: '8px', borderRadius: '6px', fontSize: '0.85rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4ade80', fontWeight: 'bold' }}>
-            <span>Total:</span>
-            <span>${totalTrabajo.toLocaleString('es-CL')} CLP</span>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginTop: 'auto' }}>
-          <button onClick={() => generarPDFFormal(item)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF Cliente</button>
-          <button onClick={() => generarPDFOperativo(item)} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>PDF Taller</button>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button onClick={() => duplicarCotizacion(item)} style={{ flex: 1, backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>Duplicar</button>
-          <button onClick={() => enviarWhatsAppFormal(item)} style={{ flex: 1, backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>WhatsApp</button>
-          <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
-        </div>
-      </div>
-    );
-  };
+  // Agrupación de inventario por categoría
+  const categoriasOrden = ['Neón LED Flex', 'Planchas de Acrílico', 'Planchas de Trovicel', 'Vinilos y Impresión', 'General'];
+  const inventarioAgrupado = categoriasOrden.reduce((acc, cat) => {
+    acc[cat] = inventario.filter(item => (item.categoria || 'General') === cat);
+    return acc;
+  }, {});
 
   // ==========================================
   // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV)
@@ -506,240 +382,174 @@ export default function App() {
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>4. CRM ({clientesCRM.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('calendario')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'calendario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'calendario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>AGENDA</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>5. Calendario</div>
-            </div>
-
             <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 'bold' }}>BODEGA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
             </div>
-
-            <div onClick={() => setVistaActiva('egresos')} style={{ flex: '1 1 0px', minWidth: '140px', backgroundColor: vistaActiva === 'egresos' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'egresos' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: 'bold' }}>CAJA</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>7. Finanzas</div>
-            </div>
           </div>
         </div>
 
-        {/* VISTAS ADMINISTRATIVAS */}
-        {vistaActiva === 'cotizador' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 1.5rem 0' }}>Nueva Cotización / Orden de Taller</h1>
-            <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Empresa *</label>
-                  <input type="text" value={empresa} onChange={(e) => setEmpresa(e.target.value)} required placeholder="Nombre de empresa" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Contacto / Teléfono</label>
-                  <input type="text" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Teléfono" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Producto / Material</label>
-                <select value={materialSeleccionado} onChange={(e) => setMaterialSeleccionado(e.target.value)} style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box', fontSize: '0.95rem' }}>
-                  {Object.keys(preciosMateriales).map((mat) => (
-                    <option key={mat} value={mat}>{mat} — ${preciosMateriales[mat].toLocaleString('es-CL')} / m²</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Descripción / Observaciones</label>
-                <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Detalles para el taller" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Imagen de Referencia o Boceto (Pega con Ctrl + V o sube archivo)</label>
-                <input type="file" accept="image/*" onChange={handleImagenChange} style={{ color: 'white' }} />
-                {imagenArchivo && <p style={{ color: '#4ade80', fontSize: '0.85rem' }}>✓ Imagen cargada con éxito</p>}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Ancho (cm)</label>
-                  <input type="number" value={ancho} onChange={(e) => setAncho(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Alto (cm)</label>
-                  <input type="number" value={alto} onChange={(e) => setAlto(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Cantidad</label>
-                  <input type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-
-              <button type="submit" disabled={cargando} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '14px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', width: 'fit-content' }}>
-                {cargando ? 'Guardando...' : 'Guardar y Enviar al Taller'}
-              </button>
-            </form>
-            {mensaje && <p style={{ marginTop: '1rem', fontWeight: 'bold', color: '#4ade80' }}>{mensaje}</p>}
-          </div>
-        )}
-
-        {vistaActiva === 'pendientes' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#f59e0b' }}>📋 Órdenes de Trabajo Pendientes</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-              {pendientesTrabajos.map(item => renderCardTrabajo(item))}
-            </div>
-          </div>
-        )}
-
-        {vistaActiva === 'produccion' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>🛠️ Tablero Kanban de Taller</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
-              {cotizaciones.map(item => renderCardTrabajo(item))}
-            </div>
-          </div>
-        )}
-
-        {vistaActiva === 'crm' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>👥 Directorio de Clientes (CRM)</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                  <th style={{ padding: '10px' }}>Empresa</th><th style={{ padding: '10px' }}>RUT</th><th style={{ padding: '10px' }}>Contacto</th><th style={{ padding: '10px' }}>Total Gastado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesCRM.map((cli, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #334155' }}>
-                    <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{cli.empresa}</td>
-                    <td style={{ padding: '12px' }}>{cli.rut}</td>
-                    <td style={{ padding: '12px' }}>{cli.contacto}</td>
-                    <td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>${cli.totalGastado.toLocaleString('es-CL')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {vistaActiva === 'calendario' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#a855f7' }}>📅 Calendario de Entregas</h3>
-            {cotizaciones.filter(c => c.fecha_entrega).map(item => (
-              <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '8px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <b style={{ color: '#f59e0b' }}>Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</b>
-                  <div style={{ color: 'white' }}>{item.cliente} - {item.descripcion}</div>
-                </div>
-                <span style={{ color: '#38bdf8' }}>{item.estado}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 6. BODEGA / INVENTARIO CONECTADO A SUPABASE */}
+        {/* BODEGA E INVENTARIO CON GRUPOS Y CATEGORÍAS */}
         {vistaActiva === 'inventario' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
+            {/* Formulario de registro por categorías */}
             <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>➕ Agregar Nuevo Material a la Bodega (Cloud)</h4>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>➕ Ingresar Insumo o Material por Categoría</h4>
+              
               <form onSubmit={async (e) => {
                 e.preventDefault();
-                if (!nuevoMaterialNombre || nuevoMaterialStock === '') return;
-                
+                let nombreFinal = nuevoMaterialNombre;
+
+                // Formateo automático según categoría
+                if (nuevoMaterialCategoria === 'Neón LED Flex') {
+                  nombreFinal = `Neón LED Flex ${nuevoMaterialColor || 'Blanco'}`;
+                } else if (nuevoMaterialCategoria === 'Planchas de Acrílico') {
+                  nombreFinal = `Acrílico ${nuevoMaterialEspesor} ${nuevoMaterialColor || 'Transparente'}`;
+                } else if (nuevoMaterialCategoria === 'Planchas de Trovicel') {
+                  nombreFinal = `Trovicel ${nuevoMaterialEspesor} ${nuevoMaterialColor || 'Blanco'}`;
+                }
+
+                if (!nombreFinal || nuevoMaterialStock === '') return;
+
                 const { error } = await supabase.from('inventario').insert([
-                  { material: nuevoMaterialNombre, stock: parseInt(nuevoMaterialStock) || 0, unidad: nuevoMaterialUnidad }
+                  { 
+                    categoria: nuevoMaterialCategoria, 
+                    material: nombreFinal, 
+                    color: nuevoMaterialColor, 
+                    espesor: nuevoMaterialEspesor,
+                    stock: parseInt(nuevoMaterialStock) || 0, 
+                    unidad: nuevoMaterialCategoria === 'Neón LED Flex' ? 'paquetes (5m)' : 'planchas' 
+                  }
                 ]);
 
                 if (!error) {
                   setNuevoMaterialNombre('');
+                  setNuevoMaterialColor('');
                   setNuevoMaterialStock('');
                   cargarDatos();
                 } else {
-                  alert('Error al agregar material: ' + error.message);
+                  alert('Error al ingresar insumo: ' + error.message);
                 }
-              }} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+              }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+                
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre del Material / Insumo</label>
-                  <input type="text" value={nuevoMaterialNombre} onChange={(e) => setNuevoMaterialNombre(e.target.value)} required placeholder="Ej. Planchas Acrílico 4mm" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Stock Inicial</label>
-                  <input type="number" value={nuevoMaterialStock} onChange={(e) => setNuevoMaterialStock(e.target.value)} required placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Unidad</label>
-                  <select value={nuevoMaterialUnidad} onChange={(e) => setNuevoMaterialUnidad(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
-                    <option value="planchas">planchas</option>
-                    <option value="rollos">rollos</option>
-                    <option value="metros">metros</option>
-                    <option value="unidades">unidades</option>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Grupo / Familia</label>
+                  <select 
+                    value={nuevoMaterialCategoria} 
+                    onChange={(e) => {
+                      setNuevoMaterialCategoria(e.target.value);
+                      if (e.target.value === 'Neón LED Flex') setNuevoMaterialUnidad('paquetes (5m)');
+                      else if (e.target.value.includes('Planchas')) setNuevoMaterialUnidad('planchas');
+                      else setNuevoMaterialUnidad('unidades');
+                    }} 
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}
+                  >
+                    <option value="Neón LED Flex">Neón LED Flex (Paquetes 5m)</option>
+                    <option value="Planchas de Acrílico">Planchas de Acrílico</option>
+                    <option value="Planchas de Trovicel">Planchas de Trovicel</option>
+                    <option value="Vinilos y Impresión">Vinilos e Impresión</option>
+                    <option value="General">Otros Insumos</option>
                   </select>
                 </div>
-                <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Guardar</button>
+
+                {nuevoMaterialCategoria === 'Neón LED Flex' && (
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Color de Neón</label>
+                    <input type="text" value={nuevoMaterialColor} onChange={(e) => setNuevoMaterialColor(e.target.value)} required placeholder="Ej. Cálido, Azul, Rojo, Rosa" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+                  </div>
+                )}
+
+                {(nuevoMaterialCategoria === 'Planchas de Acrílico' || nuevoMaterialCategoria === 'Planchas de Trovicel') && (
+                  <>
+                    <div>
+                      <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Espesor</label>
+                      <select value={nuevoMaterialEspesor} onChange={(e) => setNuevoMaterialEspesor(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}>
+                        <option value="2mm">2 mm</option>
+                        <option value="3mm">3 mm</option>
+                        <option value="4mm">4 mm</option>
+                        <option value="5mm">5 mm</option>
+                        <option value="10mm">10 mm</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'block', marginBottom: '4px' }}>Color / Acabado</label>
+                      <input type="text" value={nuevoMaterialColor} onChange={(e) => setNuevoMaterialColor(e.target.value)} required placeholder="Ej. Blanco, Transparente, Negro" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+                    </div>
+                  </>
+                )}
+
+                {nuevoMaterialCategoria === 'General' && (
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre Insumo</label>
+                    <input type="text" value={nuevoMaterialNombre} onChange={(e) => setNuevoMaterialNombre(e.target.value)} required placeholder="Ej. Transformadores 12V" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Cantidad en Stock</label>
+                  <input type="number" value={nuevoMaterialStock} onChange={(e) => setNuevoMaterialStock(e.target.value)} required placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+                </div>
+
+                <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Guardar En Bodega</button>
               </form>
             </div>
 
-            <div>
-              <h3 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>📦 Control de Inventario y Bodega</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                    <th style={{ padding: '12px' }}>Material / Insumo</th>
-                    <th style={{ padding: '12px' }}>Stock Actual</th>
-                    <th style={{ padding: '12px' }}>Unidad</th>
-                    <th style={{ padding: '12px', textAlign: 'center' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inventario.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No hay materiales registrados en la bodega.</td>
-                    </tr>
-                  ) : (
-                    inventario.map((inv) => (
-                      <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
-                        <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
-                        <td style={{ padding: '14px', color: inv.stock < 5 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>{inv.stock}</td>
-                        <td style={{ padding: '14px', color: '#94a3b8' }}>{inv.unidad}</td>
-                        <td style={{ padding: '14px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                          <button onClick={async () => {
-                            const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
-                            if (nuevo !== null) {
-                              const { error } = await supabase.from('inventario').update({ stock: parseInt(nuevo) || 0 }).eq('id', inv.id);
-                              if (!error) cargarDatos();
-                            }
-                          }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
-                          
-                          <button onClick={async () => {
-                            if (confirm(`¿Eliminar ${inv.material} de la bodega?`)) {
-                              const { error } = await supabase.from('inventario').delete().eq('id', inv.id);
-                              if (!error) cargarDatos();
-                            }
-                          }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            {/* Visualización por Categorías */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {Object.keys(inventarioAgrupado).map((catName) => {
+                const itemsGroup = inventarioAgrupado[catName];
+                if (itemsGroup.length === 0) return null;
+
+                return (
+                  <div key={catName} style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b' }}>
+                    <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8', borderBottom: '2px solid #38bdf8', paddingBottom: '0.4rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>📦 {catName}</span>
+                      <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>{itemsGroup.length} ítems</span>
+                    </h3>
+
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                          <th style={{ padding: '10px' }}>Insumo / Detalle</th>
+                          <th style={{ padding: '10px' }}>Stock Disponible</th>
+                          <th style={{ padding: '10px' }}>Unidad</th>
+                          <th style={{ padding: '10px', textAlign: 'center' }}>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itemsGroup.map((inv) => (
+                          <tr key={inv.id} style={{ borderBottom: '1px solid #1e293b' }}>
+                            <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
+                            <td style={{ padding: '12px', color: inv.stock < 3 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                              {inv.stock}
+                            </td>
+                            <td style={{ padding: '12px', color: '#94a3b8' }}>{inv.unidad || 'paquetes'}</td>
+                            <td style={{ padding: '12px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                              <button onClick={async () => {
+                                const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
+                                if (nuevo !== null) {
+                                  const { error } = await supabase.from('inventario').update({ stock: parseInt(nuevo) || 0 }).eq('id', inv.id);
+                                  if (!error) cargarDatos();
+                                }
+                              }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
+                              
+                              <button onClick={async () => {
+                                if (confirm(`¿Eliminar ${inv.material}?`)) {
+                                  const { error } = await supabase.from('inventario').delete().eq('id', inv.id);
+                                  if (!error) cargarDatos();
+                                }
+                              }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
             </div>
 
-          </div>
-        )}
-
-        {vistaActiva === 'egresos' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, color: '#0284c7' }}>Finanzas y Egresos</h3>
-              <button onClick={generarReportePDF} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Descargar Reporte PDF</button>
-            </div>
-            <form onSubmit={guardarEgreso} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-              <input type="text" value={descEgreso} onChange={(e) => setDescEgreso(e.target.value)} required placeholder="Descripción del gasto" style={{ padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-              <input type="number" value={montoEgreso} onChange={(e) => setMontoEgreso(e.target.value)} required placeholder="Monto $" style={{ padding: '10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-              <button type="submit" style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Registrar Gasto</button>
-            </form>
           </div>
         )}
 
