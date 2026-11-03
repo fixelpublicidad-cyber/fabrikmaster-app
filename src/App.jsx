@@ -63,15 +63,9 @@ export default function App() {
   const [montoEgreso, setMontoEgreso] = useState('');
   const [catEgreso, setCatEgreso] = useState('Insumos / Materiales');
   const [listaEgresos, setListaEgresos] = useState([]);
-  const [filtroMes, setFiltroMes] = useState('todos');
-
-  // Inventario local de bodega con estados para agregar nuevos materiales
-  const [inventario, setInventario] = useState([
-    { id: 1, material: 'Planchas Acrílico 3mm Blanco', stock: 10, unidad: 'planchas' },
-    { id: 2, material: 'Planchas Trovicel 3mm', stock: 15, unidad: 'planchas' },
-    { id: 3, material: 'Planchas Trovicel 5mm', stock: 8, unidad: 'planchas' },
-    { id: 4, material: 'Vinilo Adhesivo Impresión (Rollo)', stock: 2, unidad: 'rollos' },
-  ]);
+  
+  // Inventario sincronizado con Supabase
+  const [inventario, setInventario] = useState([]);
   const [nuevoMaterialNombre, setNuevoMaterialNombre] = useState('');
   const [nuevoMaterialStock, setNuevoMaterialStock] = useState('');
   const [nuevoMaterialUnidad, setNuevoMaterialUnidad] = useState('planchas');
@@ -82,19 +76,14 @@ export default function App() {
   const [cotizaciones, setCotizaciones] = useState([]);
 
   const cargarDatos = async () => {
-    const { data: dataCot, error: errCot } = await supabase
-      .from('cotizaciones')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data: dataCot } = await supabase.from('cotizaciones').select('*').order('created_at', { ascending: false });
+    if (dataCot) setCotizaciones(dataCot);
 
-    if (!errCot && dataCot) setCotizaciones(dataCot);
+    const { data: dataEgr } = await supabase.from('egresos').select('*').order('created_at', { ascending: false });
+    if (dataEgr) setListaEgresos(dataEgr);
 
-    const { data: dataEgr, error: errEgr } = await supabase
-      .from('egresos')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!errEgr && dataEgr) setListaEgresos(dataEgr);
+    const { data: dataInv } = await supabase.from('inventario').select('*').order('material', { ascending: true });
+    if (dataInv) setInventario(dataInv);
   };
 
   useEffect(() => {
@@ -107,9 +96,8 @@ export default function App() {
 
     const canal = supabase
       .channel('cambios-taller')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
-        cargarDatos();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => cargarDatos())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventario' }, () => cargarDatos())
       .subscribe();
 
     return () => {
@@ -126,9 +114,7 @@ export default function App() {
         if (items[i].type.indexOf('image') !== -1) {
           const blob = items[i].getAsFile();
           const reader = new FileReader();
-          reader.onloadend = () => {
-            setImagenArchivo(reader.result);
-          };
+          reader.onloadend = () => setImagenArchivo(reader.result);
           reader.readAsDataURL(blob);
           break;
         }
@@ -148,16 +134,12 @@ export default function App() {
   };
 
   const handleImagenChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      procesarArchivo(e.target.files[0]);
-    }
+    if (e.target.files && e.target.files[0]) procesarArchivo(e.target.files[0]);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      procesarArchivo(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) procesarArchivo(e.dataTransfer.files[0]);
   };
 
   const calcularValores = () => {
@@ -232,7 +214,6 @@ export default function App() {
     setCargando(false);
 
     if (error) {
-      console.error('Error al guardar:', error);
       setMensaje('Error al guardar: ' + error.message);
     } else {
       setMensaje(`¡Cotización N° ${String(nroCotizacion).padStart(3, '0')} generada con éxito!`);
@@ -349,16 +330,6 @@ export default function App() {
   };
 
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
-  const trabajosEnDiseno = cotizaciones.filter(c => c.estado === 'En Diseño');
-  const trabajosEnProduccion = cotizaciones.filter(c => c.estado === 'En Corte/Producción');
-  const trabajosListos = cotizaciones.filter(c => c.estado === 'Listo');
-  const trabajosEntregados = cotizaciones.filter(c => c.estado === 'Entregado');
-
-  const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
-  const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
-  const totalEgresosTaller = listaEgresos.reduce((acc, item) => acc + Number(item.monto || 0), 0);
-  const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
-
   const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
     const trabajosCliente = cotizaciones.filter(c => c.cliente === nombreEmpresa);
     return {
@@ -376,7 +347,6 @@ export default function App() {
     const estadoActual = item.estado || 'Pendiente';
     const abonoActual = Number(item.abono || 0);
     const totalTrabajo = Number(item.total || 0);
-    const saldoPendiente = totalTrabajo - abonoActual;
     
     return (
       <div key={item.id} style={{ backgroundColor: '#090d16', padding: '1rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -393,7 +363,6 @@ export default function App() {
         </div>
 
         {item.fecha_entrega && <div style={{ color: '#f59e0b', fontSize: '0.75rem' }}>📅 Entrega: {new Date(item.fecha_entrega).toLocaleDateString('es-CL')}</div>}
-        
         {item.imagen_archivo && <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }} />}
         
         <div style={{ backgroundColor: '#131c2e', padding: '8px', borderRadius: '6px', fontSize: '0.85rem' }}>
@@ -669,25 +638,27 @@ export default function App() {
           </div>
         )}
 
-        {/* 6. BODEGA / INVENTARIO CON MODIFICAR STOCK Y AGREGAR NUEVOS ÍTEMS */}
+        {/* 6. BODEGA / INVENTARIO CONECTADO A SUPABASE */}
         {vistaActiva === 'inventario' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
-            {/* Formulario para agregar nuevo material */}
             <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>➕ Agregar Nuevo Material a la Bodega</h4>
-              <form onSubmit={(e) => {
+              <h4 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>➕ Agregar Nuevo Material a la Bodega (Cloud)</h4>
+              <form onSubmit={async (e) => {
                 e.preventDefault();
                 if (!nuevoMaterialNombre || nuevoMaterialStock === '') return;
-                const nuevoItem = {
-                  id: Date.now(),
-                  material: nuevoMaterialNombre,
-                  stock: parseInt(nuevoMaterialStock) || 0,
-                  unidad: nuevoMaterialUnidad
-                };
-                setInventario([...inventario, nuevoItem]);
-                setNuevoMaterialNombre('');
-                setNuevoMaterialStock('');
+                
+                const { error } = await supabase.from('inventario').insert([
+                  { material: nuevoMaterialNombre, stock: parseInt(nuevoMaterialStock) || 0, unidad: nuevoMaterialUnidad }
+                ]);
+
+                if (!error) {
+                  setNuevoMaterialNombre('');
+                  setNuevoMaterialStock('');
+                  cargarDatos();
+                } else {
+                  alert('Error al agregar material: ' + error.message);
+                }
               }} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre del Material / Insumo</label>
@@ -706,11 +677,10 @@ export default function App() {
                     <option value="unidades">unidades</option>
                   </select>
                 </div>
-                <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Agregar</button>
+                <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Guardar</button>
               </form>
             </div>
 
-            {/* Listado de Inventario */}
             <div>
               <h3 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>📦 Control de Inventario y Bodega</h3>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
@@ -723,27 +693,35 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {inventario.map((inv) => (
-                    <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
-                      <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
-                      <td style={{ padding: '14px', color: inv.stock < 5 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>{inv.stock}</td>
-                      <td style={{ padding: '14px', color: '#94a3b8' }}>{inv.unidad}</td>
-                      <td style={{ padding: '14px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                        <button onClick={() => {
-                          const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
-                          if (nuevo !== null) {
-                            setInventario(inventario.map(i => i.id === inv.id ? {...i, stock: parseInt(nuevo) || 0} : i));
-                          }
-                        }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
-                        
-                        <button onClick={() => {
-                          if (confirm(`¿Eliminar ${inv.material} del inventario?`)) {
-                            setInventario(inventario.filter(i => i.id !== inv.id));
-                          }
-                        }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
-                      </td>
+                  {inventario.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No hay materiales registrados en la bodega.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    inventario.map((inv) => (
+                      <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
+                        <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
+                        <td style={{ padding: '14px', color: inv.stock < 5 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>{inv.stock}</td>
+                        <td style={{ padding: '14px', color: '#94a3b8' }}>{inv.unidad}</td>
+                        <td style={{ padding: '14px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                          <button onClick={async () => {
+                            const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
+                            if (nuevo !== null) {
+                              const { error } = await supabase.from('inventario').update({ stock: parseInt(nuevo) || 0 }).eq('id', inv.id);
+                              if (!error) cargarDatos();
+                            }
+                          }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
+                          
+                          <button onClick={async () => {
+                            if (confirm(`¿Eliminar ${inv.material} de la bodega?`)) {
+                              const { error } = await supabase.from('inventario').delete().eq('id', inv.id);
+                              if (!error) cargarDatos();
+                            }
+                          }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
