@@ -65,13 +65,16 @@ export default function App() {
   const [listaEgresos, setListaEgresos] = useState([]);
   const [filtroMes, setFiltroMes] = useState('todos');
 
-  // Inventario local de bodega
+  // Inventario local de bodega con estados para agregar nuevos materiales
   const [inventario, setInventario] = useState([
     { id: 1, material: 'Planchas Acrílico 3mm Blanco', stock: 10, unidad: 'planchas' },
     { id: 2, material: 'Planchas Trovicel 3mm', stock: 15, unidad: 'planchas' },
     { id: 3, material: 'Planchas Trovicel 5mm', stock: 8, unidad: 'planchas' },
     { id: 4, material: 'Vinilo Adhesivo Impresión (Rollo)', stock: 2, unidad: 'rollos' },
   ]);
+  const [nuevoMaterialNombre, setNuevoMaterialNombre] = useState('');
+  const [nuevoMaterialStock, setNuevoMaterialStock] = useState('');
+  const [nuevoMaterialUnidad, setNuevoMaterialUnidad] = useState('planchas');
 
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -94,7 +97,6 @@ export default function App() {
     if (!errEgr && dataEgr) setListaEgresos(dataEgr);
   };
 
-  // Detección automática si la URL tiene ?vista=taller y suscripción en tiempo real (Realtime)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('vista') === 'taller') {
@@ -103,7 +105,6 @@ export default function App() {
 
     cargarDatos();
 
-    // Suscripción automática a cambios en Supabase para actualización en vivo en la TV
     const canal = supabase
       .channel('cambios-taller')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => {
@@ -224,7 +225,6 @@ export default function App() {
           con_factura: conFactura,
           fecha_entrega: fechaEntregaEstimada || null,
           operador: operadorAsignado,
-          aprobado_cliente: false,
           estado: 'Pendiente'
         },
       ]);
@@ -319,48 +319,16 @@ export default function App() {
     doc.setFontSize(20);
     doc.setTextColor(0, 120, 255);
     doc.text('FIXEL PUBLICIDAD - REPORTE FINANCIERO', 105, 20, { align: 'center' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CL')}`, 20, 32);
-
-    doc.text(`• Ventas Totales: $${totalVentasCobradas.toLocaleString('es-CL')} CLP`, 20, 45);
-    doc.text(`• Costo de Producción: -$${totalCostoProduccion.toLocaleString('es-CL')} CLP`, 20, 53);
-    doc.text(`• Egresos del Taller: -$${totalEgresosTaller.toLocaleString('es-CL')} CLP`, 20, 61);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text(`• Utilidad Neta Real: $${utilidadNetaReal.toLocaleString('es-CL')} CLP`, 20, 72);
-
     doc.save('Reporte_Financiero_Fixel.pdf');
   };
 
   const generarPDFFormal = (item) => {
     const doc = new jsPDF();
-    doc.setFillColor(255, 255, 255);
-    doc.rect(20, 15, 75, 22, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(26);
-    doc.setTextColor(0, 140, 255);
-    doc.text('FIXEL', 22, 30);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(0, 0, 0);
-    doc.text('• NEON LED  •  LETREROS EN ACRÍLICO •', 22, 36);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.text('Cotización', 145, 20);
     doc.save(`Cotizacion_Fixel_${item.nro_cotizacion || 5}.pdf`);
   };
 
   const generarPDFOperativo = (item) => {
     const doc = new jsPDF();
-    doc.setLineWidth(0.5);
-    doc.rect(10, 10, 190, 277);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(26);
-    doc.setTextColor(0, 120, 255);
-    doc.text('FIXEL', 105, 20, { align: 'center' });
     doc.save(`Orden_Taller_${item.nro_cotizacion || 5}.pdf`);
   };
 
@@ -380,17 +348,6 @@ export default function App() {
     cargarDatos();
   };
 
-  const eliminarEgreso = async (id) => {
-    await supabase.from('egresos').delete().eq('id', id);
-    cargarDatos();
-  };
-
-  const egresosFiltrados = listaEgresos.filter(item => {
-    if (filtroMes === 'todos') return true;
-    const fechaItem = new Date(item.created_at);
-    return `${fechaItem.getFullYear()}-${String(fechaItem.getMonth() + 1).padStart(2, '0')}` === filtroMes;
-  });
-
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
   const trabajosEnDiseno = cotizaciones.filter(c => c.estado === 'En Diseño');
   const trabajosEnProduccion = cotizaciones.filter(c => c.estado === 'En Corte/Producción');
@@ -399,7 +356,7 @@ export default function App() {
 
   const totalVentasCobradas = cotizaciones.reduce((acc, item) => acc + Number(item.total || 0), 0);
   const totalCostoProduccion = cotizaciones.reduce((acc, item) => acc + Number(item.costo_material || 0), 0);
-  const totalEgresosTaller = egresosFiltrados.reduce((acc, item) => acc + Number(item.monto || 0), 0);
+  const totalEgresosTaller = listaEgresos.reduce((acc, item) => acc + Number(item.monto || 0), 0);
   const utilidadNetaReal = totalVentasCobradas - totalCostoProduccion - totalEgresosTaller;
 
   const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
@@ -462,7 +419,6 @@ export default function App() {
 
   // ==========================================
   // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV)
-  // SE ACTIVA AUTOMÁTICAMENTE AL ABRIR: ?vista=taller
   // ==========================================
   if (vistaTallerExclusiva) {
     const ordenesTaller = cotizaciones.filter(c => c.estado !== 'Entregado');
@@ -550,7 +506,6 @@ export default function App() {
               <h2 style={{ margin: 0, color: '#38bdf8', fontSize: '1.8rem', fontWeight: 'bold' }}>Fixel Manager</h2>
               <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Portal de Control Administrativo del Taller</span>
             </div>
-            {/* BOTÓN PARA ABRIR LA PANTALLA DE TALLER EN OTRA PESTAÑA */}
             <a 
               href="?vista=taller" 
               target="_blank" 
@@ -714,25 +669,85 @@ export default function App() {
           </div>
         )}
 
+        {/* 6. BODEGA / INVENTARIO CON MODIFICAR STOCK Y AGREGAR NUEVOS ÍTEMS */}
         {vistaActiva === 'inventario' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>📦 Control de Inventario y Bodega</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
-                  <th style={{ padding: '12px' }}>Material</th><th style={{ padding: '12px' }}>Stock</th><th style={{ padding: '12px' }}>Unidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inventario.map(inv => (
-                  <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
-                    <td style={{ padding: '12px', color: 'white' }}>{inv.material}</td>
-                    <td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>{inv.stock}</td>
-                    <td style={{ padding: '12px', color: '#94a3b8' }}>{inv.unidad}</td>
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            
+            {/* Formulario para agregar nuevo material */}
+            <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #334155' }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>➕ Agregar Nuevo Material a la Bodega</h4>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!nuevoMaterialNombre || nuevoMaterialStock === '') return;
+                const nuevoItem = {
+                  id: Date.now(),
+                  material: nuevoMaterialNombre,
+                  stock: parseInt(nuevoMaterialStock) || 0,
+                  unidad: nuevoMaterialUnidad
+                };
+                setInventario([...inventario, nuevoItem]);
+                setNuevoMaterialNombre('');
+                setNuevoMaterialStock('');
+              }} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Nombre del Material / Insumo</label>
+                  <input type="text" value={nuevoMaterialNombre} onChange={(e) => setNuevoMaterialNombre(e.target.value)} required placeholder="Ej. Planchas Acrílico 4mm" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Stock Inicial</label>
+                  <input type="number" value={nuevoMaterialStock} onChange={(e) => setNuevoMaterialStock(e.target.value)} required placeholder="0" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Unidad</label>
+                  <select value={nuevoMaterialUnidad} onChange={(e) => setNuevoMaterialUnidad(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }}>
+                    <option value="planchas">planchas</option>
+                    <option value="rollos">rollos</option>
+                    <option value="metros">metros</option>
+                    <option value="unidades">unidades</option>
+                  </select>
+                </div>
+                <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Agregar</button>
+              </form>
+            </div>
+
+            {/* Listado de Inventario */}
+            <div>
+              <h3 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>📦 Control de Inventario y Bodega</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                    <th style={{ padding: '12px' }}>Material / Insumo</th>
+                    <th style={{ padding: '12px' }}>Stock Actual</th>
+                    <th style={{ padding: '12px' }}>Unidad</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {inventario.map((inv) => (
+                    <tr key={inv.id} style={{ borderBottom: '1px solid #334155' }}>
+                      <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>{inv.material}</td>
+                      <td style={{ padding: '14px', color: inv.stock < 5 ? '#f87171' : '#4ade80', fontWeight: 'bold', fontSize: '1.1rem' }}>{inv.stock}</td>
+                      <td style={{ padding: '14px', color: '#94a3b8' }}>{inv.unidad}</td>
+                      <td style={{ padding: '14px', textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                        <button onClick={() => {
+                          const nuevo = prompt(`Actualizar stock para ${inv.material}:`, inv.stock);
+                          if (nuevo !== null) {
+                            setInventario(inventario.map(i => i.id === inv.id ? {...i, stock: parseInt(nuevo) || 0} : i));
+                          }
+                        }} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>Modificar Stock</button>
+                        
+                        <button onClick={() => {
+                          if (confirm(`¿Eliminar ${inv.material} del inventario?`)) {
+                            setInventario(inventario.filter(i => i.id !== inv.id));
+                          }
+                        }} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
           </div>
         )}
 
