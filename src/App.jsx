@@ -19,14 +19,14 @@ export default function App() {
   const [conFactura, setConFactura] = useState(true);
 
   // Detalles de la Cotización Personalizada
-  const [formaLetrero, setFormaLetrero] = useState('Rectangular / Cuadrado');
+  const [formaLetrero, setFormaLetrero] = useState('No requiere / Estándar');
   const [materialSeleccionado, setMaterialSeleccionado] = useState('Trovicel 3 mm + Gráfica laminado PVC');
   const [ancho, setAncho] = useState('120');
   const [alto, setAlto] = useState('80');
   const [cantidad, setCantidad] = useState('1');
   const [descripcion, setDescripcion] = useState('');
   
-  // 📝 NUEVO CAMPO: Notas técnicas especiales para el taller
+  // Notas técnicas especiales para el taller
   const [notasTecnicas, setNotasTecnicas] = useState('');
 
   // Neón LED 1ra Generación y Acabados Variables
@@ -170,7 +170,7 @@ export default function App() {
     const nroCotizacion = cotizaciones.length + 5;
 
     const resumenAcabados = [
-      `Forma: ${formaLetrero}`,
+      formaLetrero !== 'No requiere / Estándar' ? `Forma: ${formaLetrero}` : '',
       llevaNeon1Gen ? `Neón 1ra Gen (${metrosNeon}m)` : 'Sin Neón',
       incluirBastidor ? 'Bastidor Metálico' : '',
       incluirInstalacion ? 'Con Instalación' : ''
@@ -192,7 +192,7 @@ export default function App() {
           nro_cotizacion: nroCotizacion,
           material: materialSeleccionado,
           descripcion: `${resumenAcabados} - Medidas: ${ancho}x${alto}cm - Detalle: ${descripcion || 'Personalizado'}`,
-          notas_tecnicas: notasTecnicas, // Guardamos notas en la base de datos
+          notas_tecnicas: notasTecnicas,
           ancho: parseFloat(ancho),
           alto: parseFloat(alto),
           cantidad: parseInt(cantidad),
@@ -222,7 +222,7 @@ export default function App() {
       cargarDatos();
       setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
       setTelefonoWhatsApp(''); setDescripcion(''); setNotasTecnicas(''); setAbono('');
-      setPrecioManualTotal('');
+      setPrecioManualTotal(''); setFormaLetrero('No requiere / Estándar');
       setFechaEntregaEstimada(''); setImagenArchivo('');
       setOperadorAsignado('Operador 1'); setConFactura(true);
     }
@@ -415,7 +415,6 @@ export default function App() {
         <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1.1rem' }}>{item.cliente}</div>
         <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
         
-        {/* Visualización de Notas Técnicas en la Tarjeta */}
         {item.notas_tecnicas && (
           <div style={{ backgroundColor: '#451a03', border: '1px solid #f59e0b', padding: '6px 8px', borderRadius: '6px', color: '#fde68a', fontSize: '0.8rem' }}>
             <b>⚠️ Nota Taller:</b> {item.notas_tecnicas}
@@ -658,11 +657,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* FORMA Y MATERIAL */}
+              {/* FORMA Y MATERIAL (CON LA OPCIÓN "NO REQUIERE") */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#38bdf8', display: 'block', marginBottom: '0.4rem' }}>Forma / Geometría del Letrero</label>
                   <select value={formaLetrero} onChange={(e) => setFormaLetrero(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}>
+                    <option value="No requiere / Estándar">No requiere / Estándar</option>
                     <option value="Rectangular / Cuadrado">Rectangular / Cuadrado</option>
                     <option value="Circular (1 Cara o 2 Caras)">Circular (1 o 2 Caras)</option>
                     <option value="Silueta / Corpóreo Personalizado">Silueta / Corpóreo Personalizado</option>
@@ -736,7 +736,7 @@ export default function App() {
                 <input type="text" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Letrero con neón 1ra gen y perfil negro" style={{ width: '100%', padding: '12px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', boxSizing: 'border-box' }} />
               </div>
 
-              {/* 📝 NUEVO CAMPO: NOTAS TÉCNICAS ESPECIALES PARA EL TALLER */}
+              {/* NOTAS TÉCNICAS */}
               <div style={{ backgroundColor: '#451a03', padding: '1.2rem', borderRadius: '8px', border: '1px solid #f59e0b', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fde68a' }}>⚠️ Notas Técnicas Especiales / Instrucciones para Operador 1</label>
                 <textarea 
