@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import jsPDF from 'jspdf';
 
 export default function App() {
   const [vistaTallerExclusiva, setVistaTallerExclusiva] = useState(false);
@@ -24,6 +23,10 @@ export default function App() {
   const [imagenArchivo, setImagenArchivo] = useState('');
   const [fechaEntregaEstimada, setFechaEntregaEstimada] = useState('');
   const [operadorAsignado, setOperadorAsignado] = useState('Operador 1');
+
+  // Filtros de fecha para el Historial
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   // Precios dinámicos
   const [preciosMateriales, setPreciosMateriales] = useState({
@@ -296,6 +299,19 @@ export default function App() {
   };
 
   const pendientesTrabajos = cotizaciones.filter(c => c.estado === 'Pendiente');
+  
+  // Filtrado de Historial con rango de fechas opcional
+  const trabajosHistorial = cotizaciones.filter(c => {
+    const esFinalizado = c.estado === 'Listo' || c.estado === 'Entregado';
+    if (!esFinalizado) return false;
+
+    const fechaRegistro = c.created_at ? c.created_at.substring(0, 10) : '';
+    if (fechaDesde && fechaRegistro < fechaDesde) return false;
+    if (fechaHasta && fechaRegistro > fechaHasta) return false;
+
+    return true;
+  });
+
   const clientesCRM = Array.from(new Set(cotizaciones.map(c => c.cliente))).map(nombreEmpresa => {
     const trabajosCliente = cotizaciones.filter(c => c.cliente === nombreEmpresa);
     return {
@@ -357,7 +373,7 @@ export default function App() {
   };
 
   // ==========================================
-  // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV) - FILTRADA SOLO EN PRODUCCIÓN
+  // PANTALLA EXCLUSIVA PARA EL TALLER (MODO TV)
   // ==========================================
   if (vistaTallerExclusiva) {
     const ordenesTaller = cotizaciones.filter(c => c.estado === 'En Corte/Producción');
@@ -456,32 +472,37 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.8rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
-            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
             </div>
 
-            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>ORDEN</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>2. Órdenes ({pendientesTrabajos.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>KANBAN</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizaciones.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>4. CRM ({clientesCRM.length})</div>
+            <div onClick={() => setVistaActiva('historial')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'historial' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'historial' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>HISTORIAL</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>4. Listos ({trabajosHistorial.length})</div>
             </div>
 
-            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>5. CRM ({clientesCRM.length})</div>
+            </div>
+
+            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 'bold' }}>BODEGA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
             </div>
 
-            <div onClick={() => setVistaActiva('precios')} style={{ flex: '1 1 0px', minWidth: '130px', backgroundColor: vistaActiva === 'precios' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'precios' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('precios')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'precios' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'precios' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>TARIFAS</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>8. Precios</div>
             </div>
@@ -697,7 +718,66 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. CRM CLIENTES */}
+        {/* 4. HISTORIAL CON FILTRO DE FECHAS */}
+        {vistaActiva === 'historial' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3 style={{ margin: 0, color: '#38bdf8' }}>📦 Historial de Trabajos Listos y Entregados ({trabajosHistorial.length})</h3>
+              
+              {/* Barra de Filtros por Fecha */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', backgroundColor: '#090d16', padding: '8px 12px', borderRadius: '8px', border: '1px solid #334155', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'bold' }}>📅 Filtrar por fecha:</span>
+                <div>
+                  <input 
+                    type="date" 
+                    value={fechaDesde} 
+                    onChange={(e) => setFechaDesde(e.target.value)} 
+                    style={{ backgroundColor: '#131c2e', border: '1px solid #334155', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }} 
+                  />
+                </div>
+                <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>a</span>
+                <div>
+                  <input 
+                    type="date" 
+                    value={fechaHasta} 
+                    onChange={(e) => setFechaHasta(e.target.value)} 
+                    style={{ backgroundColor: '#131c2e', border: '1px solid #334155', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }} 
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    const hoy = new Date().toISOString().substring(0, 10);
+                    setFechaDesde(hoy);
+                    setFechaHasta(hoy);
+                  }}
+                  style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  Hoy
+                </button>
+                {(fechaDesde || fechaHasta) && (
+                  <button 
+                    onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+                    style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
+                  >
+                    Ver Todos
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {trabajosHistorial.length === 0 ? (
+              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>
+                {fechaDesde || fechaHasta ? 'No hay trabajos finalizados en el rango de fechas seleccionado.' : 'No hay trabajos listos o entregados.'}
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>
+                {trabajosHistorial.map(item => renderCardTrabajo(item))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. CRM CLIENTES */}
         {vistaActiva === 'crm' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>👥 Directorio de Clientes (CRM)</h3>
@@ -861,13 +941,13 @@ export default function App() {
                       ${(preciosMateriales[mat] || 0).toLocaleString('es-CL')}
                     </td>
                     <td style={{ padding: '14px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      <button onClick={() => modificarNombreMaterial(mat)} style={{ backgroundColor: '#334155', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                      <button onClick={() => modificarNombreMaterial(mat)} style={{ backgroundColor: '#334155', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.80rem', fontWeight: 'bold' }}>
                         ✏️ Nombre
                       </button>
-                      <button onClick={() => modificarPrecioMaterial(mat)} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                      <button onClick={() => modificarPrecioMaterial(mat)} style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.80rem', fontWeight: 'bold' }}>
                         💲 Precio
                       </button>
-                      <button onClick={() => eliminarMaterialTarifa(mat)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                      <button onClick={() => eliminarMaterialTarifa(mat)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.80rem' }}>
                         🗑️
                       </button>
                     </td>
