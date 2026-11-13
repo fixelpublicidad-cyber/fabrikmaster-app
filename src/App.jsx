@@ -345,6 +345,56 @@ export default function App() {
     doc.save(`Orden_${nroStr}_${item.cliente}.pdf`);
   };
 
+  const imprimirOrdenTaller = (item) => {
+    const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
+    const ventanaImpresion = window.open('', '_blank');
+    const listaItems = item.items_json || [];
+    
+    let htmlItems = listaItems.map((it, idx) => `
+      <div style="border: 2px solid #000; padding: 10px; margin-bottom: 10px; border-radius: 6px;">
+        <h3 style="margin: 0 0 5px 0;">Ítem ${idx + 1}: ${it.materialSeleccionado}</h3>
+        <p style="font-size: 1.2rem; font-weight: bold; margin: 5px 0;">Medidas: ${it.ancho} × ${it.alto} cm — Cantidad: ${it.cantidad} un.</p>
+        ${it.notasTecnicas ? `<p style="background: #ffeb3b; padding: 5px; margin: 5px 0; font-weight: bold;">⚠️ NOTA: ${it.notasTecnicas}</p>` : ''}
+      </div>
+    `).join('');
+
+    ventanaImpresion.document.write(`
+      <html>
+        <head>
+          <title>Orden N° ${nroStr} - ${item.cliente}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+            h1 { border-bottom: 2px solid #000; padding-bottom: 5px; }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <h1>FIXEL MANAGER — ORDEN DE TRABAJO N° ${nroStr}</h1>
+          <p><b>Cliente / Empresa:</b> ${item.cliente}</p>
+          <p><b>Contacto:</b> ${item.contacto || '---'} | Tel: ${item.telefono || '---'}</p>
+          <p><b>Fecha de Entrega:</b> ${item.fecha_entrega ? new Date(item.fecha_entrega).toLocaleDateString('es-CL') : 'Por definir'}</p>
+          <p><b>Operador Asignado:</b> ${item.operador || 'Operador 1'}</p>
+          <hr/>
+          <h2>Detalle de Producción:</h2>
+          ${htmlItems}
+          <hr/>
+          <p style="font-size: 1.2rem;"><b>Total Orden:</b> $${Number(item.total || 0).toLocaleString('es-CL')} CLP</p>
+        </body>
+      </html>
+    `);
+    ventanaImpresion.document.close();
+  };
+
+  const abrirWhatsAppCliente = (telefono, cliente, nro) => {
+    if (!telefono) {
+      alert('Este cliente no tiene un teléfono registrado.');
+      return;
+    }
+    const telLimpio = telefono.replace(/\D/g, '');
+    const nroStr = String(nro || 5).padStart(3, '0');
+    const mensajeWp = encodeURIComponent(`Hola ${cliente}, te escribimos de Fixel Manager respecto a tu Orden de Trabajo N° ${nroStr}. ¿Cómo estás?`);
+    window.open(`https://wa.me/${telLimpio}?text=${mensajeWp}`, '_blank');
+  };
+
   const modificarNombreMaterial = async (nombreAntiguo) => {
     const nuevoNombre = prompt(`Nuevo nombre para "${nombreAntiguo}":`, nombreAntiguo);
     if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre === nombreAntiguo) return;
@@ -426,10 +476,15 @@ export default function App() {
       rut: trabajosCliente[0]?.rut || '---',
       giro: trabajosCliente[0]?.giro || '---',
       contacto: trabajosCliente[0]?.contacto || '---',
+      telefono: trabajosCliente[0]?.telefono || '',
       cantidadTrabajos: trabajosCliente.length,
       totalGastado: trabajosCliente.reduce((acc, c) => acc + Number(c.total || 0), 0)
     };
   });
+
+  // KPIs de resumen mes actual
+  const ventasTotalesMes = cotizaciones.reduce((acc, c) => acc + Number(c.total || 0), 0);
+  const ordenesActivasTaller = cotizaciones.filter(c => c.estado !== 'Entregado' && c.estado !== 'Listo').length;
 
   const renderCardTrabajo = (item) => {
     const nroStr = String(item.nro_cotizacion || 5).padStart(3, '0');
@@ -443,7 +498,14 @@ export default function App() {
           <span style={{ fontWeight: 'bold', color: '#38bdf8' }}>N° {nroStr}</span>
           <button onClick={() => cambiarEstado(item.id, estadoActual)} style={{ backgroundColor: '#1e293b', border: '1px solid #334155', color: '#38bdf8', padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>📍 {estadoActual} ➔</button>
         </div>
-        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1.1rem' }}>{item.cliente}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 'bold', color: 'white', fontSize: '1.1rem' }}>{item.cliente}</div>
+          {item.telefono && (
+            <button onClick={() => abrirWhatsAppCliente(item.telefono, item.cliente, item.nro_cotizacion)} style={{ backgroundColor: '#15803d', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>
+              💬 WhatsApp
+            </button>
+          )}
+        </div>
         <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Giro: {item.giro || '---'} | Cont: {item.contacto || '---'}</div>
         
         {listaItems.length > 0 ? (
@@ -481,7 +543,8 @@ export default function App() {
 
         <div style={{ display: 'flex', gap: '0.4rem', marginTop: 'auto', flexWrap: 'wrap' }}>
           <button onClick={() => generarPDFOrden(item)} style={{ flex: '1', backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>📥 PDF</button>
-          <button onClick={() => duplicarOrden(item)} style={{ flex: '1', backgroundColor: '#334155', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>⚡ Duplicar</button>
+          <button onClick={() => imprimirOrdenTaller(item)} style={{ backgroundColor: '#d97706', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>🖨️ Imprimir</button>
+          <button onClick={() => duplicarOrden(item)} style={{ backgroundColor: '#334155', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}>⚡ Duplicar</button>
           <button onClick={() => eliminarCotizacion(item.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}>🗑️</button>
         </div>
       </div>
@@ -503,7 +566,7 @@ export default function App() {
         </div>
 
         {ordenesTaller.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '6rem', backgroundColor: '#111827', borderRadius: '16px', border: '1px solid #1f2937' }}>
+          <div style={{ textAlign: 'center', padding: '6rem', backgroundColor: '#111827', borderRadius: '16px', border: '2px solid #1f2937' }}>
             <h2 style={{ color: '#9ca3af' }}>No hay trabajos en proceso de corte o producción en este momento.</h2>
           </div>
         ) : (
@@ -562,6 +625,22 @@ export default function App() {
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', fontFamily: 'sans-serif', padding: '2rem 1rem', color: '#f8fafc' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
+        {/* RESUMEN / KPIS SUPERIORES */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Ventas Totales Registradas</span>
+            <span style={{ color: '#4ade80', fontSize: '1.5rem', fontWeight: 'bold', marginTop: '4px' }}>${ventasTotalesMes.toLocaleString('es-CL')} CLP</span>
+          </div>
+          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Órdenes Activas en Taller</span>
+            <span style={{ color: '#38bdf8', fontSize: '1.5rem', fontWeight: 'bold', marginTop: '4px' }}>{ordenesActivasTaller} órdenes</span>
+          </div>
+          <div style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Balance de Caja Neto</span>
+            <span style={{ color: balanceCaja >= 0 ? '#38bdf8' : '#f87171', fontSize: '1.5rem', fontWeight: 'bold', marginTop: '4px' }}>${balanceCaja.toLocaleString('es-CL')} CLP</span>
+          </div>
+        </div>
+
         {/* ENCABEZADO Y NAVEGACIÓN COMPLETA */}
         <div style={{ backgroundColor: '#131c2e', padding: '1.5rem', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: '0 12px 30px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -911,13 +990,31 @@ export default function App() {
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8' }}>👥 Directorio de Clientes (CRM)</h3>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-              <thead><tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}><th style={{ padding: '10px' }}>Empresa</th><th style={{ padding: '10px' }}>Giro</th><th style={{ padding: '10px' }}>RUT</th><th style={{ padding: '10px' }}>Contacto</th><th style={{ padding: '10px' }}>Trabajos</th><th style={{ padding: '10px' }}>Total Gastado</th></tr></thead>
-              <tbody>{clientesCRM.map((cli, idx) => (<tr key={idx} style={{ borderBottom: '1px solid #334155' }}><td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{cli.empresa}</td><td style={{ padding: '12px' }}>{cli.giro}</td><td style={{ padding: '12px' }}>{cli.rut}</td><td style={{ padding: '12px' }}>{cli.contacto}</td><td style={{ padding: '12px' }}>{cli.cantidadTrabajos}</td><td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>${cli.totalGastado.toLocaleString('es-CL')}</td></tr>))}</tbody>
+              <thead><tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}><th style={{ padding: '10px' }}>Empresa</th><th style={{ padding: '10px' }}>Giro</th><th style={{ padding: '10px' }}>RUT</th><th style={{ padding: '10px' }}>Contacto</th><th style={{ padding: '10px' }}>WhatsApp</th><th style={{ padding: '10px' }}>Trabajos</th><th style={{ padding: '10px' }}>Total Gastado</th></tr></thead>
+              <tbody>
+                {clientesCRM.map((cli, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #334155' }}>
+                    <td style={{ padding: '12px', fontWeight: 'bold', color: 'white' }}>{cli.empresa}</td>
+                    <td style={{ padding: '12px' }}>{cli.giro}</td>
+                    <td style={{ padding: '12px' }}>{cli.rut}</td>
+                    <td style={{ padding: '12px' }}>{cli.contacto}</td>
+                    <td style={{ padding: '12px' }}>
+                      {cli.telefono ? (
+                        <button onClick={() => abrirWhatsAppCliente(cli.telefono, cli.empresa, 1)} style={{ backgroundColor: '#15803d', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                          💬 {cli.telefono}
+                        </button>
+                      ) : '---'}
+                    </td>
+                    <td style={{ padding: '12px' }}>{cli.cantidadTrabajos}</td>
+                    <td style={{ padding: '12px', color: '#4ade80', fontWeight: 'bold' }}>${cli.totalGastado.toLocaleString('es-CL')}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         )}
 
-        {/* 7. INVENTARIO Y BODEGA CON ALERTA DE STOCK BAJO */}
+        {/* 7. INVENTARIO Y BODEGA */}
         {vistaActiva === 'inventario' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <h3 style={{ margin: 0, color: '#f97316' }}>📦 Inventario y Bodega del Taller</h3>
