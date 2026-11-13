@@ -346,7 +346,6 @@ export default function App() {
     doc.save(`Orden_${nroStr}_${item.cliente}.pdf`);
   };
 
-  // Gestión de tarifas
   const modificarNombreMaterial = async (nombreAntiguo) => {
     const nuevoNombre = prompt(`Nuevo nombre para "${nombreAntiguo}":`, nombreAntiguo);
     if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre === nombreAntiguo) return;
@@ -572,7 +571,6 @@ export default function App() {
             </div>
             <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' --></div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>5. CRM ({clientesCRM.length})</div>
             </div>
             <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
