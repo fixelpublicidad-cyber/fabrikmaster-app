@@ -16,7 +16,7 @@ export default function App() {
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
   const [conFactura, setConFactura] = useState(true);
 
-  // Lista de ítems en la solicitud (comienza vacía para que agregues libremente)
+  // Lista de ítems en la solicitud
   const [itemsCotizacion, setItemsCotizacion] = useState([]);
 
   // Estados temporales para agregar un nuevo ítem de forma limpia
@@ -59,8 +59,13 @@ export default function App() {
   const [nuevoMatNombre, setNuevoMatNombre] = useState('');
   const [nuevoMatPrecio, setNuevoMatPrecio] = useState('');
   
-  // Inventario
+  // Inventario y Bodega
   const [inventario, setInventario] = useState([]);
+  const [nuevoInvMaterial, setNuevoInvMaterial] = useState('');
+  const [nuevoInvCategoria, setNuevoInvCategoria] = useState('Planchas / Soportes');
+  const [nuevoInvStock, setNuevoInvStock] = useState('');
+  const [nuevoInvUnidad, setNuevoInvUnidad] = useState('planchas');
+
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -220,7 +225,7 @@ export default function App() {
       setMensaje(`¡Orden de Trabajo N° ${String(nroCotizacion).padStart(3, '0')} guardada con éxito!`);
       cargarDatos();
       setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
-      setTelefonoWhatsApp(''); setAbono(''); setBocetoGeneral(''); setدItemsCotizacion([]);
+      setTelefonoWhatsApp(''); setAbono(''); setBocetoGeneral(''); setItemsCotizacion([]);
       setFechaEntregaEstimada(''); setConFactura(true);
     }
   };
@@ -373,6 +378,28 @@ export default function App() {
     await supabase.from('precios_materiales').insert([{ nombre: nuevoMatNombre.trim(), precio_m2: valNum }]);
     setNuevoMatNombre(''); setNuevoMatPrecio('');
     cargarDatos();
+  };
+
+  // Funciones de Inventario
+  const agregarNuevoInventario = async (e) => {
+    e.preventDefault();
+    if (!nuevoInvMaterial || !nuevoInvStock) return;
+    const stockVal = parseFloat(nuevoInvStock) || 0;
+    const { error } = await supabase.from('inventario').insert([
+      { material: nuevoInvMaterial.trim(), categoria: nuevoInvCategoria, stock: stockVal, unidad: nuevoInvUnidad }
+    ]);
+    if (!error) {
+      setNuevoInvMaterial('');
+      setNuevoInvStock('');
+      cargarDatos();
+    }
+  };
+
+  const eliminarInventarioItem = async (id) => {
+    if (confirm('¿Eliminar este ítem del inventario?')) {
+      await supabase.from('inventario').delete().eq('id', id);
+      cargarDatos();
+    }
   };
 
   const cotizacionesFiltradas = cotizaciones.filter(c => {
@@ -595,7 +622,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* 1. COTIZADOR CON TABLA VACÍA Y LIMPIA */}
+        {/* 1. COTIZADOR */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div>
@@ -605,7 +632,6 @@ export default function App() {
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               
-              {/* DATOS DE CLIENTE Y CRM */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #1e293b' }}>
                 <div>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#e4e4e7', display: 'block', marginBottom: '0.4rem' }}>Empresa *</label>
@@ -633,7 +659,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* FACTURACIÓN */}
               <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#38bdf8', display: 'block' }}>📄 Régimen Fiscal / Facturación</label>
@@ -649,7 +674,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* TABLA DE SOLICITUD */}
               <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.8rem' }}>
@@ -704,7 +728,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* FORMULARIO PARA AGREGAR NUEVO PRODUCTO */}
                 <div style={{ backgroundColor: '#131c2e', padding: '1rem', borderRadius: '10px', border: '1px dashed #334155', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                   <span style={{ color: '#38bdf8', fontSize: '0.85rem', fontWeight: 'bold' }}>+ Agregar nuevo producto a la tabla:</span>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem', alignItems: 'center' }}>
@@ -725,7 +748,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* RESUMEN DE TOTALES */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', paddingTop: '1rem', borderTop: '2px solid #1e293b', fontSize: '1.1rem', marginTop: '0.5rem' }}>
                   <div style={{ color: '#94a3b8' }}>Neto <span style={{ color: 'white', fontWeight: 'bold', marginLeft: '10px' }}>${Math.round(netoGlobal).toLocaleString('es-CL')}</span></div>
                   <div style={{ color: '#94a3b8' }}>{conFactura ? 'IVA 19%' : 'Sin Factura'} <span style={{ color: 'white', fontWeight: 'bold', marginLeft: '10px' }}>${Math.round(ivaGlobal).toLocaleString('es-CL')}</span></div>
@@ -734,7 +756,6 @@ export default function App() {
 
               </div>
 
-              {/* ZONA DE BOCETO GENERAL (ÚNICO AL FINAL) */}
               <div style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', outline: 'none' }} tabIndex={0} onPaste={handlePasteBocetoGeneral}>
                 <span style={{ color: '#38bdf8', fontSize: '0.9rem', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>🖼️ Boceto o Imagen General de la Orden (Haz clic aquí y presiona <b>Ctrl + V</b> para pegar)</span>
                 <span style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '10px' }}>Adjunta una sola imagen de referencia para toda la solicitud.</span>
@@ -748,7 +769,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* DATOS DE PAGO Y ENTREGA */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '12px', border: '1px solid #1e293b' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#a1a1aa', display: 'block', marginBottom: '0.4rem' }}>Abono Inicial ($)</label>
@@ -782,7 +802,7 @@ export default function App() {
           </div>
         )}
 
-        {/* PESTAÑAS RESTANTES (PENDIENTES, KANBAN, HISTORIAL, CAJA, CRM, BODEGA, PRECIOS) */}
+        {/* PESTAÑAS RESTANTES */}
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#f59e0b' }}>📋 Órdenes de Trabajo Pendientes</h3>
@@ -897,10 +917,75 @@ export default function App() {
           </div>
         )}
 
+        {/* 7. INVENTARIO Y BODEGA CON ALERTA DE STOCK BAJO */}
         {vistaActiva === 'inventario' && (
-          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#f97316' }}>📦 Inventario y Bodega</h3>
-            {inventario.length === 0 ? <p style={{ color: '#94a3b8' }}>Sin registros de inventario.</p> : inventario.map(inv => (<div key={inv.id} style={{ color: 'white', padding: '8px 0', borderBottom: '1px solid #334155' }}>{inv.material} — Stock: {inv.stock} {inv.unidad}</div>))}
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <h3 style={{ margin: 0, color: '#f97316' }}>📦 Inventario y Bodega del Taller</h3>
+
+            <form onSubmit={agregarNuevoInventario} style={{ display: 'flex', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', flexWrap: 'wrap', alignItems: 'end' }}>
+              <div style={{ flex: '2 1 200px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Material / Insumo *</label>
+                <input type="text" value={nuevoInvMaterial} onChange={(e) => setNuevoInvMaterial(e.target.value)} required placeholder="Ej. Trovicel 5mm" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Categoría</label>
+                <select value={nuevoInvCategoria} onChange={(e) => setNuevoInvCategoria(e.target.value)} style={{ padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}>
+                  <option value="Planchas / Soportes">Planchas / Soportes</option>
+                  <option value="Vinilos / Adhesivos">Vinilos / Adhesivos</option>
+                  <option value="Iluminación / LEDs">Iluminación / LEDs</option>
+                  <option value="Tintas / Insumos">Tintas / Insumos</option>
+                  <option value="Otros">Otros</option>
+                </select>
+              </div>
+              <div style={{ flex: '1 1 100px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Stock *</label>
+                <input type="number" step="any" value={nuevoInvStock} onChange={(e) => setNuevoInvStock(e.target.value)} required placeholder="10" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              </div>
+              <div style={{ flex: '1 1 120px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Unidad</label>
+                <input type="text" value={nuevoInvUnidad} onChange={(e) => setNuevoInvUnidad(e.target.value)} placeholder="planchas / metros" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              </div>
+              <button type="submit" style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Registrar</button>
+            </form>
+
+            {inventario.length === 0 ? (
+              <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>Sin registros de inventario actualmente.</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                    <th style={{ padding: '12px' }}>Material / Insumo</th>
+                    <th style={{ padding: '12px' }}>Categoría</th>
+                    <th style={{ padding: '12px' }}>Stock Actual</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventario.map(inv => {
+                    const esStockBajo = Number(inv.stock || 0) <= 2;
+                    return (
+                      <tr key={inv.id} style={{ borderBottom: '1px solid #1e293b', backgroundColor: esStockBajo ? 'rgba(239, 68, 68, 0.08)' : 'transparent' }}>
+                        <td style={{ padding: '14px', fontWeight: 'bold', color: 'white' }}>
+                          {inv.material}
+                          {esStockBajo && (
+                            <span style={{ marginLeft: '10px', backgroundColor: '#7f1d1d', color: '#fca5a5', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>
+                              ⚠️ Stock Crítico
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '14px', color: '#cbd5e1' }}>{inv.categoria}</td>
+                        <td style={{ padding: '14px', color: esStockBajo ? '#f87171' : '#4ade80', fontWeight: 'bold' }}>
+                          {inv.stock} {inv.unidad}
+                        </td>
+                        <td style={{ padding: '14px', textAlign: 'right' }}>
+                          <button onClick={() => eliminarInventarioItem(inv.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️ Eliminar</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
