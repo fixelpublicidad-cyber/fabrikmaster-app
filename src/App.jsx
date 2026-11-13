@@ -16,7 +16,7 @@ export default function App() {
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
   const [conFactura, setConFactura] = useState(true);
 
-  // Lista de ítems en la solicitud tipo carrito
+  // Lista de ítems en la solicitud tipo carrito (con soporte para pegar bocetos)
   const [itemsCotizacion, setItemsCotizacion] = useState([
     {
       id: Date.now(),
@@ -43,6 +43,13 @@ export default function App() {
   // Filtros de fecha para el Historial
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+
+  // Módulo de Finanzas / Caja (Ingresos y Egresos)
+  const [transaccionesCaja, setTransaccionesCaja] = useState([]);
+  const [tipoTransaccion, setTipoTransaccion] = useState('Egreso');
+  const [montoTransaccion, setMontoTransaccion] = useState('');
+  const [categoriaTransaccion, setCategoriaTransaccion] = useState('Materiales / Insumos');
+  const [descripcionTransaccion, setDescripcionTransaccion] = useState('');
 
   // Precios dinámicos base
   const [preciosMateriales, setPreciosMateriales] = useState({
@@ -77,6 +84,9 @@ export default function App() {
       dataPrecios.forEach(p => { mapaPrecios[p.nombre] = p.precio_m2; });
       setPreciosMateriales(mapaPrecios);
     }
+
+    const { data: dataCaja } = await supabase.from('transacciones_caja').select('*').order('created_at', { ascending: false });
+    if (dataCaja) setTransaccionesCaja(dataCaja);
   };
 
   useEffect(() => {
@@ -89,6 +99,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cotizaciones' }, () => cargarDatos())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventario' }, () => cargarDatos())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'precios_materiales' }, () => cargarDatos())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transacciones_caja' }, () => cargarDatos())
       .subscribe();
 
     return () => { supabase.removeChannel(canal); };
@@ -127,6 +138,22 @@ export default function App() {
       return;
     }
     setItemsCotizacion(itemsCotizacion.filter((_, i) => i !== index));
+  };
+
+  // Manejo de pegado de imágenes con portapapeles (Ctrl + V)
+  const handlePasteItemImage = (index, e) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          actualizarItem(index, 'imagenArchivo', reader.result);
+        };
+        reader.readAsDataURL(blob);
+        e.preventDefault();
+      }
+    }
   };
 
   const calcularMetrosCuadrados = (item) => {
@@ -205,6 +232,7 @@ export default function App() {
           metodo_pago: metodoPago,
           costo_material: 0,
           margen_utilidad: 0,
+          imagen_archivo: itemsCotizacion[0]?.imagenArchivo || '',
           con_factura: conFactura,
           fecha_entrega: fechaEntregaEstimada || null,
           operador: operadorAsignado,
@@ -231,6 +259,42 @@ export default function App() {
       setFechaEntregaEstimada(''); setConFactura(true);
     }
   };
+
+  // Registrar Transacción en Caja (Ingreso / Egreso)
+  const guardarTransaccionCaja = async (e) => {
+    e.preventDefault();
+    if (!montoTransaccion || !descripcionTransaccion) {
+      alert('Por favor ingresa el monto y la descripción.');
+      return;
+    }
+    const valNum = parseFloat(montoTransaccion) || 0;
+    const { error } = await supabase.from('transacciones_caja').insert([
+      {
+        tipo: tipoTransaccion,
+        monto: valNum,
+        categoria: categoriaTransaccion,
+        descripcion: descripcionTransaccion
+      }
+    ]);
+    if (error) {
+      alert('Error al registrar transacción: ' + error.message);
+    } else {
+      setMontoTransaccion('');
+      setDescripcionTransaccion('');
+      cargarDatos();
+    }
+  };
+
+  const eliminarTransaccion = async (id) => {
+    if (confirm('¿Eliminar este registro de caja?')) {
+      await supabase.from('transacciones_caja').delete().eq('id', id);
+      cargarDatos();
+    }
+  };
+
+  const totalIngresosCaja = transaccionesCaja.filter(t => t.tipo === 'Ingreso').reduce((acc, t) => acc + Number(t.monto || 0), 0);
+  const totalEgresosCaja = transaccionesCaja.filter(t => t.tipo === 'Egreso').reduce((acc, t) => acc + Number(t.monto || 0), 0);
+  const balanceCaja = totalIngresosCaja - totalEgresosCaja;
 
   const cambiarEstado = async (id, estadoActual) => {
     const estadosPosibles = ['Pendiente', 'En Diseño', 'En Corte/Producción', 'Listo', 'Entregado'];
@@ -277,7 +341,7 @@ export default function App() {
         metrosNeon: '0',
         precioManual: String(item.neto || ''),
         incluirBastidor: false,
-        imagenArchivo: ''
+        imagenArchivo: item.imagen_archivo || ''
       }]);
     }
     setOperadorAsignado(item.operador || 'Operador 1');
@@ -430,6 +494,13 @@ export default function App() {
           <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{item.descripcion}</div>
         )}
 
+        {item.imagen_archivo && (
+          <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '6px', padding: '4px', border: '1px solid #334155' }}>
+            <span style={{ color: '#94a3b8', fontSize: '0.7rem', display: 'block' }}>BOCETO ADJUNTO:</span>
+            <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '110px', objectFit: 'contain', borderRadius: '4px' }} />
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#38bdf8', backgroundColor: '#1e293b', padding: '4px 8px', borderRadius: '4px' }}>
           <span>👤 Operador: <b>{item.operador || 'Operador 1'}</b></span>
           <button onClick={() => cambiarOperador(item.id, item.operador)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 'bold' }}>Cambiar</button>
@@ -543,43 +614,47 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.8rem', width: '100%', overflowX: 'auto', paddingBottom: '4px' }}>
-            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('cotizador')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'cotizador' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'cotizador' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 'bold' }}>NUEVA</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>1. Cotización</div>
             </div>
-            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('pendientes')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'pendientes' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'pendientes' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 'bold' }}>ORDEN</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>2. Órdenes ({pendientesTrabajos.length})</div>
             </div>
-            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('produccion')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'produccion' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'produccion' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>KANBAN</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>3. Taller ({cotizacionesFiltradas.length})</div>
             </div>
-            <div onClick={() => setVistaActiva('historial')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'historial' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'historial' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('historial')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'historial' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'historial' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>HISTORIAL</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>4. Listos ({trabajosHistorial.length})</div>
             </div>
-            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('caja')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'caja' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'caja' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: '#4ade80', fontWeight: 'bold' }}>FINANZAS</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>5. Caja</div>
+            </div>
+            <div onClick={() => setVistaActiva('crm')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'crm' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'crm' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 'bold' }}>CLIENTES</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>5. CRM ({clientesCRM.length})</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>6. CRM ({clientesCRM.length})</div>
             </div>
-            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('inventario')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'inventario' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'inventario' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 'bold' }}>BODEGA</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>6. Inventario</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>7. Inventario</div>
             </div>
-            <div onClick={() => setVistaActiva('precios')} style={{ flex: '1 1 0px', minWidth: '120px', backgroundColor: vistaActiva === 'precios' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'precios' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
+            <div onClick={() => setVistaActiva('precios')} style={{ flex: '1 1 0px', minWidth: '110px', backgroundColor: vistaActiva === 'precios' ? '#0284c7' : '#0f172a', border: `2px solid ${vistaActiva === 'precios' ? '#38bdf8' : '#334155'}`, padding: '0.8rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 'bold' }}>TARIFAS</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'white' }}>8. Precios</div>
             </div>
           </div>
         </div>
 
-        {/* 1. COTIZADOR CON FORMULARIO CLIENTE + CARRITO DE SOLICITUD */}
+        {/* 1. COTIZADOR CON FORMULARIO CLIENTE + CARRITO DE SOLICITUD + PEGADO DE BOCETOS */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div>
               <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Cotización / Orden de Trabajo (Múltiples Ítems)</h1>
-              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Llena los datos del cliente para la base de datos y agrega los diferentes productos solicitados.</p>
+              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Llena los datos del cliente y añade los productos con su respectivo boceto (puedes hacer clic en la zona de boceto y presionar Ctrl+V para pegar).</p>
             </div>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -637,8 +712,8 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* LISTADO DE ÍTEMS TIPO TABLA */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                {/* LISTADO DE ÍTEMS */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '0.5rem' }}>
                   {itemsCotizacion.map((item, index) => {
                     const m2Total = calcularMetrosCuadrados(item);
                     const subtotalItem = calcularTotalItem(item);
@@ -688,16 +763,23 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* OPCIONES EXTRAS POR ÍTEM */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', paddingTop: '6px', borderTop: '1px dashed #1e293b' }}>
-                          <div>
-                            <label style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block', marginBottom: '4px' }}>💡 Neón LED 1ra Gen (Metros opcionales)</label>
-                            <input type="number" step="0.5" value={item.metrosNeon} onChange={(e) => { actualizarItem(index, 'metrosNeon', e.target.value); actualizarItem(index, 'llevaNeon1Gen', parseFloat(e.target.value) > 0); }} placeholder="Metros lineales" style={{ width: '100%', padding: '6px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '0.8rem', color: '#fde68a', display: 'block', marginBottom: '4px' }}>⚠️ Notas Técnicas Taller</label>
-                            <input type="text" value={item.notasTecnicas} onChange={(e) => actualizarItem(index, 'notasTecnicas', e.target.value)} placeholder="Instrucciones para operador 1..." style={{ width: '100%', padding: '6px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }} />
-                          </div>
+                        {/* ZONA DE PEGADO DE BOCETO / IMAGEN CON CTRL+V */}
+                        <div style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '8px', padding: '1rem', textAlign: 'center', outline: 'none', position: 'relative' }} tabIndex={0} onPaste={(e) => handlePasteItemImage(index, e)}>
+                          <span style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '4px' }}>🖼️ Imagen de referencia o boceto (Haz clic y presiona <b>Ctrl + V</b> para pegar)</span>
+                          {item.imagenArchivo ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <img src={item.imagenArchivo} alt="Boceto cargado" style={{ maxHeight: '120px', maxWidth: '100%', borderRadius: '6px', border: '1px solid #38bdf8' }} />
+                              <button type="button" onClick={() => actualizarItem(index, 'imagenArchivo', '')} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}>Eliminar Boceto</button>
+                            </div>
+                          ) : (
+                            <div style={{ color: '#64748b', fontSize: '0.8rem', fontStyle: 'italic', padding: '10px' }}>Sin boceto pegado aún</div>
+                          )}
+                        </div>
+
+                        {/* NOTAS TÉCNICAS */}
+                        <div style={{ backgroundColor: '#451a03', padding: '10px', borderRadius: '8px', border: '1px solid #f59e0b' }}>
+                          <label style={{ fontSize: '0.8rem', color: '#fde68a', display: 'block', marginBottom: '4px' }}>⚠️ Notas Técnicas para Operador (Este ítem)</label>
+                          <input type="text" value={item.notasTecnicas} onChange={(e) => actualizarItem(index, 'notasTecnicas', e.target.value)} placeholder="Instrucciones específicas..." style={{ width: '100%', padding: '6px', backgroundColor: '#090d16', border: '1px solid #d97706', borderRadius: '6px', color: 'white', fontSize: '0.85rem', boxSizing: 'border-box' }} />
                         </div>
 
                       </div>
@@ -748,7 +830,7 @@ export default function App() {
           </div>
         )}
 
-        {/* PESTAÑAS RESTANTES (PENDIENTES, KANBAN, HISTORIAL, CRM, BODEGA, PRECIOS) */}
+        {/* PESTAÑAS RESTANTES (PENDIENTES, KANBAN, HISTORIAL, CAJA, CRM, BODEGA, PRECIOS) */}
         {vistaActiva === 'pendientes' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#f59e0b' }}>📋 Órdenes de Trabajo Pendientes</h3>
@@ -771,6 +853,89 @@ export default function App() {
               <div><label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block' }}>Hasta</label><input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} style={{ padding: '6px', background: '#131c2e', color: 'white', border: '1px solid #334155', borderRadius: '4px' }} /></div>
             </div>
             {trabajosHistorial.length === 0 ? <p style={{ color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No hay trabajos en el historial.</p> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem' }}>{trabajosHistorial.map(item => renderCardTrabajo(item))}</div>}
+          </div>
+        )}
+
+        {/* NUEVA PESTAÑA: CAJA / CONTABILIDAD (INGRESOS Y EGRESOS) */}
+        {vistaActiva === 'caja' && (
+          <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <h3 style={{ margin: 0, color: '#4ade80' }}>💰 Control de Caja: Ingresos y Egresos del Taller</h3>
+            
+            {/* TARJETAS DE RESUMEN FINANCIERO */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Total Ingresos</span>
+                <div style={{ fontSize: '1.4rem', color: '#4ade80', fontWeight: 'bold', marginTop: '4px' }}>${totalIngresosCaja.toLocaleString('es-CL')} CLP</div>
+              </div>
+              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Total Egresos (Gastos)</span>
+                <div style={{ fontSize: '1.4rem', color: '#ef4444', fontWeight: 'bold', marginTop: '4px' }}>${totalEgresosCaja.toLocaleString('es-CL')} CLP</div>
+              </div>
+              <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Balance Neto Caja</span>
+                <div style={{ fontSize: '1.4rem', color: balanceCaja >= 0 ? '#38bdf8' : '#f87171', fontWeight: 'bold', marginTop: '4px' }}>${balanceCaja.toLocaleString('es-CL')} CLP</div>
+              </div>
+            </div>
+
+            {/* FORMULARIO PARA REGISTRAR NUEVO GASTO / INGRESO */}
+            <form onSubmit={guardarTransaccionCaja} style={{ display: 'flex', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', flexWrap: 'wrap', alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Tipo</label>
+                <select value={tipoTransaccion} onChange={(e) => setTipoTransaccion(e.target.value)} style={{ padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontWeight: 'bold' }}>
+                  <option value="Egreso">Egreso (Gasto)</option>
+                  <option value="Ingreso">Ingreso</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Categoría</label>
+                <select value={categoriaTransaccion} onChange={(e) => setCategoriaTransaccion(e.target.value)} style={{ padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }}>
+                  <option value="Materiales / Insumos">Materiales / Insumos</option>
+                  <option value="Herramientas / Maquinaria">Herramientas / Maquinaria</option>
+                  <option value="Arriendo / Servicios Básicos">Arriendo / Servicios</option>
+                  <option value="Sueldos / Operadores">Sueldos / Operadores</option>
+                  <option value="Otros Gastos">Otros Gastos</option>
+                </select>
+              </div>
+              <div style={{ flex: '1 1 140px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Monto ($)</label>
+                <input type="number" value={montoTransaccion} onChange={(e) => setMontoTransaccion(e.target.value)} required placeholder="Ej. 45000" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              </div>
+              <div style={{ flex: '2 1 200px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Descripción / Detalle</label>
+                <input type="text" value={descripcionTransaccion} onChange={(e) => setDescripcionTransaccion(e.target.value)} required placeholder="Ej. Compra planchas trovicel proveedor" style={{ width: '100%', padding: '10px', backgroundColor: '#131c2e', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
+              </div>
+              <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Registrar</button>
+            </form>
+
+            {/* TABLA DE MOVIMIENTOS */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
+                  <th style={{ padding: '12px' }}>Tipo</th>
+                  <th style={{ padding: '12px' }}>Categoría</th>
+                  <th style={{ padding: '12px' }}>Descripción</th>
+                  <th style={{ padding: '12px' }}>Monto</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transaccionesCaja.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No hay transacciones registradas en caja.</td></tr>
+                ) : (
+                  transaccionesCaja.map(t => (
+                    <tr key={t.id} style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '14px', fontWeight: 'bold', color: t.tipo === 'Ingreso' ? '#4ade80' : '#ef4444' }}>{t.tipo}</td>
+                      <td style={{ padding: '14px', color: 'white' }}>{t.categoria}</td>
+                      <td style={{ padding: '14px', color: '#cbd5e1' }}>{t.descripcion}</td>
+                      <td style={{ padding: '14px', fontWeight: 'bold', color: t.tipo === 'Ingreso' ? '#4ade80' : '#ef4444' }}>${Number(t.monto || 0).toLocaleString('es-CL')}</td>
+                      <td style={{ padding: '14px', textAlign: 'right' }}>
+                        <button onClick={() => eliminarTransaccion(t.id)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}>🗑️</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
