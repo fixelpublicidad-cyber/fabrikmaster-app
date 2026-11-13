@@ -16,25 +16,8 @@ export default function App() {
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
   const [conFactura, setConFactura] = useState(true);
 
-  // Lista de ítems en la solicitud (estilo tabla limpia)
-  const [itemsCotizacion, setItemsCotizacion] = useState([
-    {
-      id: 1,
-      materialSeleccionado: 'Trovicel 5 mm + Grafica Laminado PVC',
-      ancho: '40',
-      alto: '160',
-      cantidad: '1',
-      notasTecnicas: ''
-    },
-    {
-      id: 2,
-      materialSeleccionado: 'Trovicel 5 mm + Grafica Laminado PVC',
-      ancho: '100',
-      alto: '170',
-      cantidad: '1',
-      notasTecnicas: ''
-    }
-  ]);
+  // Lista de ítems en la solicitud (comienza vacía para que agregues libremente)
+  const [itemsCotizacion, setItemsCotizacion] = useState([]);
 
   // Estados temporales para agregar un nuevo ítem de forma limpia
   const [nuevoMatItem, setNuevoMatItem] = useState('Trovicel 5 mm + Grafica Laminado PVC');
@@ -131,10 +114,6 @@ export default function App() {
   };
 
   const eliminarItemFormulario = (id) => {
-    if (itemsCotizacion.length === 1) {
-      alert('La solicitud debe tener al menos un ítem.');
-      return;
-    }
     setItemsCotizacion(itemsCotizacion.filter(item => item.id !== id));
   };
 
@@ -177,6 +156,10 @@ export default function App() {
     e.preventDefault();
     if (!empresa) {
       alert('Por favor complete el nombre de la empresa o cliente.');
+      return;
+    }
+    if (itemsCotizacion.length === 0) {
+      alert('Debe agregar al menos un producto a la solicitud.');
       return;
     }
 
@@ -237,7 +220,7 @@ export default function App() {
       setMensaje(`¡Orden de Trabajo N° ${String(nroCotizacion).padStart(3, '0')} guardada con éxito!`);
       cargarDatos();
       setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
-      setTelefonoWhatsApp(''); setAbono(''); setBocetoGeneral('');
+      setTelefonoWhatsApp(''); setAbono(''); setBocetoGeneral(''); setدItemsCotizacion([]);
       setFechaEntregaEstimada(''); setConFactura(true);
     }
   };
@@ -612,12 +595,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* 1. COTIZADOR CON TABLA EXACTA ESTILO REFERENCIA */}
+        {/* 1. COTIZADOR CON TABLA VACÍA Y LIMPIA */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div>
               <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización</h1>
-              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Rellena los datos del cliente y administra los ítems de la solicitud con el diseño exacto en tabla.</p>
+              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Rellena los datos del cliente y añade los ítems que requieras a la solicitud.</p>
             </div>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -666,10 +649,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* TABLA DE SOLICITUD ESTILO IMAGEN DE REFERENCIA */}
+              {/* TABLA DE SOLICITUD */}
               <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 
-                {/* Cabecera de la Solicitud */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.8rem' }}>
                   <div>
                     <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.1rem', letterSpacing: '0.5px' }}>TU SOLICITUD</h3>
@@ -677,48 +659,52 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Encabezados de Tabla */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 120px', padding: '0.5rem 0', borderBottom: '1px solid #1e293b', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>
                   <div>PRODUCTO</div>
                   <div style={{ textAlign: 'center' }}>CANTIDAD</div>
                   <div style={{ textAlign: 'right' }}>SUBTOTAL</div>
                 </div>
 
-                {/* Filas de la Tabla (Estilo idéntico a tu captura) */}
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {itemsCotizacion.map((item) => {
-                    const m2Total = calcularMetrosCuadrados(item);
-                    const subtotalItem = calcularTotalItem(item);
+                  {itemsCotizacion.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontStyle: 'italic' }}>
+                      No hay productos en la solicitud. Agrega ítems usando el formulario de abajo.
+                    </div>
+                  ) : (
+                    itemsCotizacion.map((item) => {
+                      const m2Total = calcularMetrosCuadrados(item);
+                      const subtotalItem = calcularTotalItem(item);
 
-                    return (
-                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 120px', padding: '1rem 0', borderBottom: '1px solid #1e293b', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: 'bold', color: '#ffffff', fontSize: '1.05rem', marginBottom: '2px' }}>
-                            {item.materialSeleccionado}
+                      return (
+                        <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 120px', padding: '1rem 0', borderBottom: '1px solid #1e293b', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontWeight: 'bold', color: '#ffffff', fontSize: '1.05rem', marginBottom: '2px' }}>
+                              {item.materialSeleccionado}
+                            </div>
+                            <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                              {item.ancho} × {item.alto} cm {item.notasTecnicas && <span style={{ color: '#fde68a' }}>({item.notasTecnicas})</span>}
+                            </div>
                           </div>
-                          <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
-                            {item.ancho} × {item.alto} cm {item.notasTecnicas && <span style={{ color: '#fde68a' }}>({item.notasTecnicas})</span>}
+
+                          <div style={{ textAlign: 'center', color: '#f8fafc', fontSize: '1rem', fontWeight: '500' }}>
+                            {m2Total.toFixed(3).replace('.', ',')} m²
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 'bold' }}>
+                              ${Math.round(subtotalItem).toLocaleString('es-CL')}
+                            </span>
+                            <button type="button" onClick={() => eliminarItemFormulario(item.id)} style={{ backgroundColor: '#1e293b', color: '#f87171', border: '1px solid #334155', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                              Quitar
+                            </button>
                           </div>
                         </div>
-
-                        <div style={{ textAlign: 'center', color: '#f8fafc', fontSize: '1rem', fontWeight: '500' }}>
-                          {m2Total.toFixed(3).replace('.', ',')} m²
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 'bold' }}>
-                            ${Math.round(subtotalItem).toLocaleString('es-CL')}
-                          </span>
-                          <button type="button" onClick={() => eliminarItemFormulario(item.id)} style={{ backgroundColor: '#1e293b', color: '#f87171', border: '1px solid #334155', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                            Quitar
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
 
-                {/* FORMULARIO PARA AGREGAR NUEVO ÍTEM LIMPIAMENTE ABAJO */}
+                {/* FORMULARIO PARA AGREGAR NUEVO PRODUCTO */}
                 <div style={{ backgroundColor: '#131c2e', padding: '1rem', borderRadius: '10px', border: '1px dashed #334155', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                   <span style={{ color: '#38bdf8', fontSize: '0.85rem', fontWeight: 'bold' }}>+ Agregar nuevo producto a la tabla:</span>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem', alignItems: 'center' }}>
