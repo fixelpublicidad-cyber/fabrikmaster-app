@@ -16,22 +16,32 @@ export default function App() {
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
   const [conFactura, setConFactura] = useState(true);
 
-  // Lista de ítems en la solicitud tipo carrito (limpia sin imágenes por ítem)
+  // Lista de ítems en la solicitud (estilo tabla limpia)
   const [itemsCotizacion, setItemsCotizacion] = useState([
     {
-      id: Date.now(),
-      formaLetrero: 'No requiere / Estándar',
-      materialSeleccionado: 'Trovicel 5 mm + Gráfica Laminado PVC',
-      ancho: '100',
-      alto: '50',
+      id: 1,
+      materialSeleccionado: 'Trovicel 5 mm + Grafica Laminado PVC',
+      ancho: '40',
+      alto: '160',
       cantidad: '1',
-      notasTecnicas: '',
-      llevaNeon1Gen: false,
-      metrosNeon: '0',
-      precioManual: '',
-      incluirBastidor: false
+      notasTecnicas: ''
+    },
+    {
+      id: 2,
+      materialSeleccionado: 'Trovicel 5 mm + Grafica Laminado PVC',
+      ancho: '100',
+      alto: '170',
+      cantidad: '1',
+      notasTecnicas: ''
     }
   ]);
+
+  // Estados temporales para agregar un nuevo ítem de forma limpia
+  const [nuevoMatItem, setNuevoMatItem] = useState('Trovicel 5 mm + Grafica Laminado PVC');
+  const [nuevoAncho, setNuevoAncho] = useState('100');
+  const [nuevoAlto, setNuevoAlto] = useState('50');
+  const [nuevaCant, setNuevaCant] = useState('1');
+  const [nuevaNota, setNuevaNota] = useState('');
 
   // Boceto general único para toda la orden
   const [bocetoGeneral, setBocetoGeneral] = useState('');
@@ -54,7 +64,7 @@ export default function App() {
 
   // Precios dinámicos base
   const [preciosMateriales, setPreciosMateriales] = useState({
-    'Trovicel 5 mm + Gráfica Laminado PVC': 35000,
+    'Trovicel 5 mm + Grafica Laminado PVC': 35000,
     'Trovicel 3 mm + Gráfica laminado PVC': 32000,
     'Acrílico 3 mm Transparente': 80000,
     'Acrílico 4 mm + Gráfica': 90000,
@@ -106,49 +116,35 @@ export default function App() {
     return () => { supabase.removeChannel(canal); };
   }, []);
 
-  const agregarItemFormulario = () => {
-    setItemsCotizacion([
-      ...itemsCotizacion,
-      {
-        id: Date.now(),
-        formaLetrero: 'No requiere / Estándar',
-        materialSeleccionado: Object.keys(preciosMateriales)[0],
-        ancho: '100',
-        alto: '50',
-        cantidad: '1',
-        notasTecnicas: '',
-        llevaNeon1Gen: false,
-        metrosNeon: '0',
-        precioManual: '',
-        incluirBastidor: false
-      }
-    ]);
+  const agregarItemALista = (e) => {
+    e.preventDefault();
+    const newItem = {
+      id: Date.now(),
+      materialSeleccionado: nuevoMatItem,
+      ancho: nuevoAncho,
+      alto: nuevoAlto,
+      cantidad: nuevaCant,
+      notasTecnicas: nuevaNota
+    };
+    setItemsCotizacion([...itemsCotizacion, newItem]);
+    setNuevaNota('');
   };
 
-  const actualizarItem = (index, campo, valor) => {
-    const nuevosItems = [...itemsCotizacion];
-    nuevosItems[index][campo] = valor;
-    setItemsCotizacion(nuevosItems);
-  };
-
-  const eliminarItemFormulario = (index) => {
+  const eliminarItemFormulario = (id) => {
     if (itemsCotizacion.length === 1) {
       alert('La solicitud debe tener al menos un ítem.');
       return;
     }
-    setItemsCotizacion(itemsCotizacion.filter((_, i) => i !== index));
+    setItemsCotizacion(itemsCotizacion.filter(item => item.id !== id));
   };
 
-  // Pegado de imagen general con Ctrl + V
   const handlePasteBocetoGeneral = (e) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const blob = items[i].getAsFile();
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setBocetoGeneral(reader.result);
-        };
+        reader.onloadend = () => { setBocetoGeneral(reader.result); };
         reader.readAsDataURL(blob);
         e.preventDefault();
       }
@@ -165,13 +161,7 @@ export default function App() {
   const calcularTotalItem = (item) => {
     const m2 = calcularMetrosCuadrados(item);
     const precioM2 = preciosMateriales[item.materialSeleccionado] || 40000;
-    
-    let subtotalMaterial = m2 * precioM2;
-    let costoNeon = item.llevaNeon1Gen ? (parseFloat(item.metrosNeon) || 0) * 8000 : 0;
-    let costoBastidor = item.incluirBastidor ? (((parseFloat(item.ancho) || 0) + (parseFloat(item.alto) || 0)) * 2 / 100) * 8000 : 0;
-
-    let calculoAutomatico = subtotalMaterial + costoNeon + costoBastidor;
-    return item.precioManual !== '' ? (parseFloat(item.precioManual) || 0) : calculoAutomatico;
+    return m2 * precioM2;
   };
 
   const calcularTotalesGlobales = () => {
@@ -248,23 +238,13 @@ export default function App() {
       cargarDatos();
       setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
       setTelefonoWhatsApp(''); setAbono(''); setBocetoGeneral('');
-      setItemsCotizacion([{
-        id: Date.now(),
-        formaLetrero: 'No requiere / Estándar',
-        materialSeleccionado: Object.keys(preciosMateriales)[0],
-        ancho: '100', alto: '50', cantidad: '1', notasTecnicas: '',
-        llevaNeon1Gen: false, metrosNeon: '0', precioManual: '', incluirBastidor: false
-      }]);
       setFechaEntregaEstimada(''); setConFactura(true);
     }
   };
 
   const guardarTransaccionCaja = async (e) => {
     e.preventDefault();
-    if (!montoTransaccion || !descripcionTransaccion) {
-      alert('Por favor ingresa el monto y la descripción.');
-      return;
-    }
+    if (!montoTransaccion || !descripcionTransaccion) return;
     const valNum = parseFloat(montoTransaccion) || 0;
     const { error } = await supabase.from('transacciones_caja').insert([
       { tipo: tipoTransaccion, monto: valNum, categoria: categoriaTransaccion, descripcion: descripcionTransaccion }
@@ -318,20 +298,6 @@ export default function App() {
     setTelefonoWhatsApp(item.telefono || '');
     if (item.items_json && item.items_json.length > 0) {
       setItemsCotizacion(item.items_json);
-    } else {
-      setItemsCotizacion([{
-        id: Date.now(),
-        formaLetrero: 'No requiere / Estándar',
-        materialSeleccionado: item.material || Object.keys(preciosMateriales)[0],
-        ancho: String(item.ancho || 100),
-        alto: String(item.alto || 50),
-        cantidad: String(item.cantidad || 1),
-        notasTecnicas: item.notas_tecnicas || '',
-        llevaNeon1Gen: false,
-        metrosNeon: '0',
-        precioManual: String(item.neto || ''),
-        incluirBastidor: false
-      }]);
     }
     setBocetoGeneral(item.imagen_archivo || '');
     setOperadorAsignado(item.operador || 'Operador 1');
@@ -366,17 +332,17 @@ export default function App() {
     doc.text('Detalle de la Solicitud (Ítems):', 14, 96);
 
     let posY = 104;
-    const listaItems = item.items_json || [{ materialSeleccionado: item.material, descripcion: item.descripcion, ancho: item.ancho, alto: item.alto, cantidad: item.cantidad, notasTecnicas: item.notas_tecnicas }];
+    const listaItems = item.items_json || [];
     
     listaItems.forEach((it, idx) => {
       if (posY > 250) { doc.addPage(); posY = 20; }
-      doc.text(`• [Ítem ${idx + 1}] ${it.materialSeleccionado || it.material}`, 14, posY);
+      doc.text(`• [Ítem ${idx + 1}] ${it.materialSeleccionado}`, 14, posY);
       posY += 6;
-      doc.text(`  Medidas: ${it.ancho} x ${it.alto} cm | Cantidad: ${it.cantidad || 1} un.`, 14, posY);
+      doc.text(`  Medidas: ${it.ancho} × ${it.alto} cm | Cantidad: ${it.cantidad || 1} un.`, 14, posY);
       posY += 6;
-      if (it.notasTecnicas || it.notas_tecnicas) {
+      if (it.notasTecnicas) {
         doc.setTextColor(220, 38, 38);
-        doc.text(`  Nota Taller: ${it.notasTecnicas || it.notas_tecnicas}`, 14, posY);
+        doc.text(`  Nota Taller: ${it.notasTecnicas}`, 14, posY);
         doc.setTextColor(0, 0, 0);
         posY += 6;
       }
@@ -646,12 +612,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* 1. COTIZADOR CON CARRITO LIMPIO ESTILO REFERENCIA */}
+        {/* 1. COTIZADOR CON TABLA EXACTA ESTILO REFERENCIA */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div>
-              <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización (Múltiples Ítems)</h1>
-              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Rellena los datos del cliente y añade los productos con su material y medidas.</p>
+              <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización</h1>
+              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Rellena los datos del cliente y administra los ítems de la solicitud con el diseño exacto en tabla.</p>
             </div>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -700,83 +666,81 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SECCIÓN DE PRODUCTOS (CARRITO LIMPIO ESTILO REFERENCIA) */}
-              <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              {/* TABLA DE SOLICITUD ESTILO IMAGEN DE REFERENCIA */}
+              <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                
+                {/* Cabecera de la Solicitud */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.8rem' }}>
                   <div>
-                    <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '1.2rem' }}>TU SOLICITUD</h3>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>GUARDADO · LO RETOMAS CUANDO KIERAS</span>
+                    <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.1rem', letterSpacing: '0.5px' }}>TU SOLICITUD</h3>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>GUARDADO · LO RETOMAS CUANDO KIERAS</span>
                   </div>
-                  <button type="button" onClick={agregarItemFormulario} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>
-                    + Agregar ítem
-                  </button>
                 </div>
 
-                {/* LISTADO DE ÍTEMS LIMPIO */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
-                  {itemsCotizacion.map((item, index) => {
+                {/* Encabezados de Tabla */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 120px', padding: '0.5rem 0', borderBottom: '1px solid #1e293b', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                  <div>PRODUCTO</div>
+                  <div style={{ textAlign: 'center' }}>CANTIDAD</div>
+                  <div style={{ textAlign: 'right' }}>SUBTOTAL</div>
+                </div>
+
+                {/* Filas de la Tabla (Estilo idéntico a tu captura) */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {itemsCotizacion.map((item) => {
                     const m2Total = calcularMetrosCuadrados(item);
                     const subtotalItem = calcularTotalItem(item);
 
                     return (
-                      <div key={item.id} style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                        
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                          <div style={{ flex: 1, minWidth: '220px' }}>
-                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>MATERIAL / PRODUCTO</label>
-                            <select 
-                              value={item.materialSeleccionado} 
-                              onChange={(e) => actualizarItem(index, 'materialSeleccionado', e.target.value)} 
-                              style={{ width: '100%', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontWeight: 'bold', fontSize: '1rem' }}
-                            >
-                              {Object.keys(preciosMateriales).map((mat) => (
-                                <option key={mat} value={mat}>{mat} (${(preciosMateriales[mat] || 0).toLocaleString('es-CL')} / m²)</option>
-                              ))}
-                            </select>
+                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 120px', padding: '1rem 0', borderBottom: '1px solid #1e293b', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: '#ffffff', fontSize: '1.05rem', marginBottom: '2px' }}>
+                            {item.materialSeleccionado}
                           </div>
-
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <div style={{ textAlign: 'center' }}>
-                              <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>ANCHO (cm)</label>
-                              <input type="number" value={item.ancho} onChange={(e) => actualizarItem(index, 'ancho', e.target.value)} required style={{ width: '70px', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', textAlign: 'center' }} />
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>ALTO (cm)</label>
-                              <input type="number" value={item.alto} onChange={(e) => actualizarItem(index, 'alto', e.target.value)} required style={{ width: '70px', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', textAlign: 'center' }} />
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>CANT.</label>
-                              <input type="number" min="1" value={item.cantidad} onChange={(e) => actualizarItem(index, 'cantidad', e.target.value)} required style={{ width: '55px', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', textAlign: 'center' }} />
-                            </div>
+                          <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                            {item.ancho} × {item.alto} cm {item.notasTecnicas && <span style={{ color: '#fde68a' }}>({item.notasTecnicas})</span>}
                           </div>
+                        </div>
 
-                          <div style={{ textAlign: 'center', minWidth: '90px' }}>
-                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>METRAJE</span>
-                            <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#38bdf8' }}>{m2Total.toFixed(3).replace('.', ',')} m²</span>
-                          </div>
+                        <div style={{ textAlign: 'center', color: '#f8fafc', fontSize: '1rem', fontWeight: '500' }}>
+                          {m2Total.toFixed(3).replace('.', ',')} m²
+                        </div>
 
-                          <div style={{ textAlign: 'right', minWidth: '100px' }}>
-                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>SUBTOTAL</span>
-                            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4ade80' }}>${Math.round(subtotalItem).toLocaleString('es-CL')}</span>
-                          </div>
-
-                          <button type="button" onClick={() => eliminarItemFormulario(index)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 'bold' }}>
+                            ${Math.round(subtotalItem).toLocaleString('es-CL')}
+                          </span>
+                          <button type="button" onClick={() => eliminarItemFormulario(item.id)} style={{ backgroundColor: '#1e293b', color: '#f87171', border: '1px solid #334155', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
                             Quitar
                           </button>
                         </div>
-
-                        {/* NOTAS TÉCNICAS OPCIONALES */}
-                        <div>
-                          <input type="text" value={item.notasTecnicas} onChange={(e) => actualizarItem(index, 'notasTecnicas', e.target.value)} placeholder="⚠️ Nota o instrucción técnica opcional para este ítem..." style={{ width: '100%', padding: '6px 10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: '#fde68a', fontSize: '0.8rem', boxSizing: 'border-box' }} />
-                        </div>
-
                       </div>
                     );
                   })}
                 </div>
 
+                {/* FORMULARIO PARA AGREGAR NUEVO ÍTEM LIMPIAMENTE ABAJO */}
+                <div style={{ backgroundColor: '#131c2e', padding: '1rem', borderRadius: '10px', border: '1px dashed #334155', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <span style={{ color: '#38bdf8', fontSize: '0.85rem', fontWeight: 'bold' }}>+ Agregar nuevo producto a la tabla:</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem', alignItems: 'center' }}>
+                    <select value={nuevoMatItem} onChange={(e) => setNuevoMatItem(e.target.value)} style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }}>
+                      {Object.keys(preciosMateriales).map((mat) => (
+                        <option key={mat} value={mat}>{mat}</option>
+                      ))}
+                    </select>
+                    <input type="number" value={nuevoAncho} onChange={(e) => setNuevoAncho(e.target.value)} placeholder="Ancho cm" style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }} />
+                    <input type="number" value={nuevoAlto} onChange={(e) => setNuevoAlto(e.target.value)} placeholder="Alto cm" style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }} />
+                    <input type="number" min="1" value={nuevaCant} onChange={(e) => setNuevaCant(e.target.value)} placeholder="Cant" style={{ padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.8rem' }}>
+                    <input type="text" value={nuevaNota} onChange={(e) => setNuevaNota(e.target.value)} placeholder="⚠️ Nota técnica opcional (ej. corte especial)..." style={{ flex: 1, padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }} />
+                    <button type="button" onClick={agregarItemALista} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      Añadir a la Tabla
+                    </button>
+                  </div>
+                </div>
+
                 {/* RESUMEN DE TOTALES */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', paddingTop: '1rem', borderTop: '2px solid #1e293b', fontSize: '1.1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', paddingTop: '1rem', borderTop: '2px solid #1e293b', fontSize: '1.1rem', marginTop: '0.5rem' }}>
                   <div style={{ color: '#94a3b8' }}>Neto <span style={{ color: 'white', fontWeight: 'bold', marginLeft: '10px' }}>${Math.round(netoGlobal).toLocaleString('es-CL')}</span></div>
                   <div style={{ color: '#94a3b8' }}>{conFactura ? 'IVA 19%' : 'Sin Factura'} <span style={{ color: 'white', fontWeight: 'bold', marginLeft: '10px' }}>${Math.round(ivaGlobal).toLocaleString('es-CL')}</span></div>
                   <div style={{ color: '#f59e0b', fontSize: '1.3rem', fontWeight: 'bold', marginTop: '4px' }}>Total referencial <span style={{ color: '#38bdf8', marginLeft: '10px' }}>${Math.round(totalGlobal).toLocaleString('es-CL')}</span></div>
@@ -784,7 +748,7 @@ export default function App() {
 
               </div>
 
-              {/* ZONA DE BOCETO GENERAL (ÚNICO PARA TODA LA ORDEN) */}
+              {/* ZONA DE BOCETO GENERAL (ÚNICO AL FINAL) */}
               <div style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', outline: 'none' }} tabIndex={0} onPaste={handlePasteBocetoGeneral}>
                 <span style={{ color: '#38bdf8', fontSize: '0.9rem', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>🖼️ Boceto o Imagen General de la Orden (Haz clic aquí y presiona <b>Ctrl + V</b> para pegar)</span>
                 <span style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '10px' }}>Adjunta una sola imagen de referencia para toda la solicitud.</span>
