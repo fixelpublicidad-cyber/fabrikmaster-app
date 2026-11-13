@@ -16,7 +16,7 @@ export default function App() {
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
   const [conFactura, setConFactura] = useState(true);
 
-  // Lista de ítems en la solicitud tipo carrito (con soporte para pegar bocetos)
+  // Lista de ítems en la solicitud tipo carrito (limpia sin imágenes por ítem)
   const [itemsCotizacion, setItemsCotizacion] = useState([
     {
       id: Date.now(),
@@ -25,15 +25,16 @@ export default function App() {
       ancho: '100',
       alto: '50',
       cantidad: '1',
-      descripcion: '',
       notasTecnicas: '',
       llevaNeon1Gen: false,
       metrosNeon: '0',
       precioManual: '',
-      incluirBastidor: false,
-      imagenArchivo: ''
+      incluirBastidor: false
     }
   ]);
+
+  // Boceto general único para toda la orden
+  const [bocetoGeneral, setBocetoGeneral] = useState('');
 
   const [abono, setAbono] = useState('');
   const [metodoPago, setMetodoPago] = useState('Transferencia');
@@ -115,13 +116,11 @@ export default function App() {
         ancho: '100',
         alto: '50',
         cantidad: '1',
-        descripcion: '',
         notasTecnicas: '',
         llevaNeon1Gen: false,
         metrosNeon: '0',
         precioManual: '',
-        incluirBastidor: false,
-        imagenArchivo: ''
+        incluirBastidor: false
       }
     ]);
   };
@@ -140,15 +139,15 @@ export default function App() {
     setItemsCotizacion(itemsCotizacion.filter((_, i) => i !== index));
   };
 
-  // Manejo de pegado de imágenes con portapapeles (Ctrl + V)
-  const handlePasteItemImage = (index, e) => {
+  // Pegado de imagen general con Ctrl + V
+  const handlePasteBocetoGeneral = (e) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const blob = items[i].getAsFile();
         const reader = new FileReader();
         reader.onloadend = () => {
-          actualizarItem(index, 'imagenArchivo', reader.result);
+          setBocetoGeneral(reader.result);
         };
         reader.readAsDataURL(blob);
         e.preventDefault();
@@ -232,7 +231,7 @@ export default function App() {
           metodo_pago: metodoPago,
           costo_material: 0,
           margen_utilidad: 0,
-          imagen_archivo: itemsCotizacion[0]?.imagenArchivo || '',
+          imagen_archivo: bocetoGeneral,
           con_factura: conFactura,
           fecha_entrega: fechaEntregaEstimada || null,
           operador: operadorAsignado,
@@ -248,19 +247,18 @@ export default function App() {
       setMensaje(`¡Orden de Trabajo N° ${String(nroCotizacion).padStart(3, '0')} guardada con éxito!`);
       cargarDatos();
       setEmpresa(''); setRut(''); setDireccion(''); setGiro(''); setContacto('');
-      setTelefonoWhatsApp(''); setAbono('');
+      setTelefonoWhatsApp(''); setAbono(''); setBocetoGeneral('');
       setItemsCotizacion([{
         id: Date.now(),
         formaLetrero: 'No requiere / Estándar',
         materialSeleccionado: Object.keys(preciosMateriales)[0],
-        ancho: '100', alto: '50', cantidad: '1', descripcion: '', notasTecnicas: '',
-        llevaNeon1Gen: false, metrosNeon: '0', precioManual: '', incluirBastidor: false, imagenArchivo: ''
+        ancho: '100', alto: '50', cantidad: '1', notasTecnicas: '',
+        llevaNeon1Gen: false, metrosNeon: '0', precioManual: '', incluirBastidor: false
       }]);
       setFechaEntregaEstimada(''); setConFactura(true);
     }
   };
 
-  // Registrar Transacción en Caja (Ingreso / Egreso)
   const guardarTransaccionCaja = async (e) => {
     e.preventDefault();
     if (!montoTransaccion || !descripcionTransaccion) {
@@ -269,16 +267,9 @@ export default function App() {
     }
     const valNum = parseFloat(montoTransaccion) || 0;
     const { error } = await supabase.from('transacciones_caja').insert([
-      {
-        tipo: tipoTransaccion,
-        monto: valNum,
-        categoria: categoriaTransaccion,
-        descripcion: descripcionTransaccion
-      }
+      { tipo: tipoTransaccion, monto: valNum, categoria: categoriaTransaccion, descripcion: descripcionTransaccion }
     ]);
-    if (error) {
-      alert('Error al registrar transacción: ' + error.message);
-    } else {
+    if (!error) {
       setMontoTransaccion('');
       setDescripcionTransaccion('');
       cargarDatos();
@@ -335,15 +326,14 @@ export default function App() {
         ancho: String(item.ancho || 100),
         alto: String(item.alto || 50),
         cantidad: String(item.cantidad || 1),
-        descripcion: item.descripcion || '',
         notasTecnicas: item.notas_tecnicas || '',
         llevaNeon1Gen: false,
         metrosNeon: '0',
         precioManual: String(item.neto || ''),
-        incluirBastidor: false,
-        imagenArchivo: item.imagen_archivo || ''
+        incluirBastidor: false
       }]);
     }
+    setBocetoGeneral(item.imagen_archivo || '');
     setOperadorAsignado(item.operador || 'Operador 1');
     setVistaActiva('cotizador');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -382,7 +372,7 @@ export default function App() {
       if (posY > 250) { doc.addPage(); posY = 20; }
       doc.text(`• [Ítem ${idx + 1}] ${it.materialSeleccionado || it.material}`, 14, posY);
       posY += 6;
-      doc.text(`  Medidas: ${it.ancho} x ${it.alto} cm | Cantidad: ${it.cantidad || 1}`, 14, posY);
+      doc.text(`  Medidas: ${it.ancho} x ${it.alto} cm | Cantidad: ${it.cantidad || 1} un.`, 14, posY);
       posY += 6;
       if (it.notasTecnicas || it.notas_tecnicas) {
         doc.setTextColor(220, 38, 38);
@@ -401,7 +391,6 @@ export default function App() {
     doc.save(`Orden_${nroStr}_${item.cliente}.pdf`);
   };
 
-  // Gestión de tarifas
   const modificarNombreMaterial = async (nombreAntiguo) => {
     const nuevoNombre = prompt(`Nuevo nombre para "${nombreAntiguo}":`, nombreAntiguo);
     if (!nuevoNombre || nuevoNombre.trim() === '' || nuevoNombre === nombreAntiguo) return;
@@ -485,7 +474,8 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {listaItems.map((it, idx) => (
               <div key={idx} style={{ backgroundColor: '#131c2e', padding: '6px', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid #1e293b' }}>
-                <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>Ít.{idx + 1}:</span> {it.materialSeleccionado} ({it.ancho}x{it.alto}cm, x{it.cantidad})
+                <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>{it.materialSeleccionado}</span>
+                <div style={{ color: '#cbd5e1' }}>{it.ancho} × {it.alto} cm (Cant: {it.cantidad})</div>
                 {it.notasTecnicas && <div style={{ color: '#fde68a', marginTop: '2px' }}>⚠️ {it.notasTecnicas}</div>}
               </div>
             ))}
@@ -496,7 +486,7 @@ export default function App() {
 
         {item.imagen_archivo && (
           <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '6px', padding: '4px', border: '1px solid #334155' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.7rem', display: 'block' }}>BOCETO ADJUNTO:</span>
+            <span style={{ color: '#94a3b8', fontSize: '0.7rem', display: 'block' }}>BOCETO GENERAL:</span>
             <img src={item.imagen_archivo} alt="Boceto" style={{ width: '100%', height: '110px', objectFit: 'contain', borderRadius: '4px' }} />
           </div>
         )}
@@ -557,9 +547,9 @@ export default function App() {
 
                   {listaItems.map((it, idx) => (
                     <div key={idx} style={{ backgroundColor: '#030712', padding: '1rem', borderRadius: '12px', border: '1px dashed #38bdf8' }}>
-                      <div style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1rem' }}>Ítem {idx + 1}: {it.materialSeleccionado}</div>
+                      <div style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '1.1rem' }}>{it.materialSeleccionado}</div>
                       <div style={{ color: '#ef4444', fontSize: '2rem', fontWeight: '900' }}>
-                        {it.ancho} x {it.alto} <span style={{ fontSize: '1.1rem' }}>cm</span>
+                        {it.ancho} × {it.alto} <span style={{ fontSize: '1.1rem' }}>cm</span>
                       </div>
                       <div style={{ color: '#e5e7eb', fontSize: '1.1rem', fontWeight: 'bold', marginTop: '4px' }}>
                         Cant: {it.cantidad} un.
@@ -571,6 +561,13 @@ export default function App() {
                       )}
                     </div>
                   ))}
+
+                  {item.imagen_archivo && (
+                    <div style={{ backgroundColor: '#000', padding: '6px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>BOCETO GENERAL:</span>
+                      <img src={item.imagen_archivo} alt="Boceto Taller" style={{ width: '100%', maxHeight: '140px', objectFit: 'contain', borderRadius: '4px' }} />
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1f2937', padding: '10px 14px', borderRadius: '10px' }}>
                     <span style={{ color: '#9ca3af' }}>Asignado a:</span>
@@ -649,12 +646,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* 1. COTIZADOR CON FORMULARIO CLIENTE + CARRITO DE SOLICITUD + PEGADO DE BOCETOS */}
+        {/* 1. COTIZADOR CON CARRITO LIMPIO ESTILO REFERENCIA */}
         {vistaActiva === 'cotizador' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2.5rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div>
-              <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Cotización / Orden de Trabajo (Múltiples Ítems)</h1>
-              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Llena los datos del cliente y añade los productos con su respectivo boceto (puedes hacer clic en la zona de boceto y presionar Ctrl+V para pegar).</p>
+              <h1 style={{ fontSize: '1.8rem', color: '#ffffff', margin: '0 0 0.5rem 0' }}>Nueva Cotización (Múltiples Ítems)</h1>
+              <p style={{ color: '#a1a1aa', fontSize: '0.95rem', margin: 0 }}>Rellena los datos del cliente y añade los productos con su material y medidas.</p>
             </div>
 
             <form onSubmit={guardarCotizacionFormal} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -695,7 +692,7 @@ export default function App() {
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button type="button" onClick={() => setConFactura(true)} style={{ backgroundColor: conFactura ? '#0284c7' : '#1e293b', color: 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                    Con Factura / Boleta (+19% IVA)
+                    Con Factura (+19% IVA)
                   </button>
                   <button type="button" onClick={() => setConFactura(false)} style={{ backgroundColor: !conFactura ? '#f59e0b' : '#1e293b', color: !conFactura ? '#090d16' : 'white', border: '1px solid #334155', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
                     Sin Factura (Venta Directa)
@@ -703,83 +700,74 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SECCIÓN DE PRODUCTOS (SOLICITUD / CARRITO) */}
+              {/* SECCIÓN DE PRODUCTOS (CARRITO LIMPIO ESTILO REFERENCIA) */}
               <div style={{ backgroundColor: '#090d16', padding: '1.5rem', borderRadius: '12px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                  <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '1.2rem' }}>🛒 TU SOLICITUD (Ítems y Materiales)</h3>
+                  <div>
+                    <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '1.2rem' }}>TU SOLICITUD</h3>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>GUARDADO · LO RETOMAS CUANDO KIERAS</span>
+                  </div>
                   <button type="button" onClick={agregarItemFormulario} style={{ backgroundColor: '#f97316', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>
-                    + Agregar a la solicitud
+                    + Agregar ítem
                   </button>
                 </div>
 
-                {/* LISTADO DE ÍTEMS */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '0.5rem' }}>
+                {/* LISTADO DE ÍTEMS LIMPIO */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
                   {itemsCotizacion.map((item, index) => {
                     const m2Total = calcularMetrosCuadrados(item);
                     const subtotalItem = calcularTotalItem(item);
 
                     return (
-                      <div key={item.id} style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div key={item.id} style={{ backgroundColor: '#131c2e', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                         
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.6rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                            <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>#{index + 1}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                          <div style={{ flex: 1, minWidth: '220px' }}>
+                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '2px' }}>MATERIAL / PRODUCTO</label>
                             <select 
                               value={item.materialSeleccionado} 
                               onChange={(e) => actualizarItem(index, 'materialSeleccionado', e.target.value)} 
-                              style={{ flex: 1, padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontWeight: 'bold' }}
+                              style={{ width: '100%', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', fontWeight: 'bold', fontSize: '1rem' }}
                             >
                               {Object.keys(preciosMateriales).map((mat) => (
                                 <option key={mat} value={mat}>{mat} (${(preciosMateriales[mat] || 0).toLocaleString('es-CL')} / m²)</option>
                               ))}
                             </select>
                           </div>
-                          <button type="button" onClick={() => eliminarItemFormulario(index)} style={{ backgroundColor: '#334155', color: '#f87171', border: '1px solid #475569', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', marginLeft: '10px' }}>
+
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <div style={{ textAlign: 'center' }}>
+                              <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>ANCHO (cm)</label>
+                              <input type="number" value={item.ancho} onChange={(e) => actualizarItem(index, 'ancho', e.target.value)} required style={{ width: '70px', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', textAlign: 'center' }} />
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>ALTO (cm)</label>
+                              <input type="number" value={item.alto} onChange={(e) => actualizarItem(index, 'alto', e.target.value)} required style={{ width: '70px', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', textAlign: 'center' }} />
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>CANT.</label>
+                              <input type="number" min="1" value={item.cantidad} onChange={(e) => actualizarItem(index, 'cantidad', e.target.value)} required style={{ width: '55px', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white', textAlign: 'center' }} />
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'center', minWidth: '90px' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>METRAJE</span>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#38bdf8' }}>{m2Total.toFixed(3).replace('.', ',')} m²</span>
+                          </div>
+
+                          <div style={{ textAlign: 'right', minWidth: '100px' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block' }}>SUBTOTAL</span>
+                            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4ade80' }}>${Math.round(subtotalItem).toLocaleString('es-CL')}</span>
+                          </div>
+
+                          <button type="button" onClick={() => eliminarItemFormulario(index)} style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
                             Quitar
                           </button>
                         </div>
 
-                        {/* MEDIDAS Y SUBTOTALES */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-                          <div>
-                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '3px' }}>Ancho (cm)</label>
-                            <input type="number" value={item.ancho} onChange={(e) => actualizarItem(index, 'ancho', e.target.value)} required style={{ width: '100%', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '3px' }}>Alto (cm)</label>
-                            <input type="number" value={item.alto} onChange={(e) => actualizarItem(index, 'alto', e.target.value)} required style={{ width: '100%', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '3px' }}>Cantidad (Cant.)</label>
-                            <input type="number" min="1" value={item.cantidad} onChange={(e) => actualizarItem(index, 'cantidad', e.target.value)} required style={{ width: '100%', padding: '8px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: 'white' }} />
-                          </div>
-                          <div style={{ textAlign: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>CANTIDAD EN m²</span>
-                            <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#38bdf8' }}>{m2Total.toFixed(3).replace('.', ',')} m²</span>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>SUBTOTAL</span>
-                            <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4ade80' }}>${Math.round(subtotalItem).toLocaleString('es-CL')}</span>
-                          </div>
-                        </div>
-
-                        {/* ZONA DE PEGADO DE BOCETO / IMAGEN CON CTRL+V */}
-                        <div style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '8px', padding: '1rem', textAlign: 'center', outline: 'none', position: 'relative' }} tabIndex={0} onPaste={(e) => handlePasteItemImage(index, e)}>
-                          <span style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '4px' }}>🖼️ Imagen de referencia o boceto (Haz clic y presiona <b>Ctrl + V</b> para pegar)</span>
-                          {item.imagenArchivo ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                              <img src={item.imagenArchivo} alt="Boceto cargado" style={{ maxHeight: '120px', maxWidth: '100%', borderRadius: '6px', border: '1px solid #38bdf8' }} />
-                              <button type="button" onClick={() => actualizarItem(index, 'imagenArchivo', '')} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}>Eliminar Boceto</button>
-                            </div>
-                          ) : (
-                            <div style={{ color: '#64748b', fontSize: '0.8rem', fontStyle: 'italic', padding: '10px' }}>Sin boceto pegado aún</div>
-                          )}
-                        </div>
-
-                        {/* NOTAS TÉCNICAS */}
-                        <div style={{ backgroundColor: '#451a03', padding: '10px', borderRadius: '8px', border: '1px solid #f59e0b' }}>
-                          <label style={{ fontSize: '0.8rem', color: '#fde68a', display: 'block', marginBottom: '4px' }}>⚠️ Notas Técnicas para Operador (Este ítem)</label>
-                          <input type="text" value={item.notasTecnicas} onChange={(e) => actualizarItem(index, 'notasTecnicas', e.target.value)} placeholder="Instrucciones específicas..." style={{ width: '100%', padding: '6px', backgroundColor: '#090d16', border: '1px solid #d97706', borderRadius: '6px', color: 'white', fontSize: '0.85rem', boxSizing: 'border-box' }} />
+                        {/* NOTAS TÉCNICAS OPCIONALES */}
+                        <div>
+                          <input type="text" value={item.notasTecnicas} onChange={(e) => actualizarItem(index, 'notasTecnicas', e.target.value)} placeholder="⚠️ Nota o instrucción técnica opcional para este ítem..." style={{ width: '100%', padding: '6px 10px', backgroundColor: '#090d16', border: '1px solid #334155', borderRadius: '6px', color: '#fde68a', fontSize: '0.8rem', boxSizing: 'border-box' }} />
                         </div>
 
                       </div>
@@ -794,6 +782,20 @@ export default function App() {
                   <div style={{ color: '#f59e0b', fontSize: '1.3rem', fontWeight: 'bold', marginTop: '4px' }}>Total referencial <span style={{ color: '#38bdf8', marginLeft: '10px' }}>${Math.round(totalGlobal).toLocaleString('es-CL')}</span></div>
                 </div>
 
+              </div>
+
+              {/* ZONA DE BOCETO GENERAL (ÚNICO PARA TODA LA ORDEN) */}
+              <div style={{ backgroundColor: '#090d16', border: '2px dashed #334155', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', outline: 'none' }} tabIndex={0} onPaste={handlePasteBocetoGeneral}>
+                <span style={{ color: '#38bdf8', fontSize: '0.9rem', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>🖼️ Boceto o Imagen General de la Orden (Haz clic aquí y presiona <b>Ctrl + V</b> para pegar)</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '10px' }}>Adjunta una sola imagen de referencia para toda la solicitud.</span>
+                {bocetoGeneral ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <img src={bocetoGeneral} alt="Boceto General" style={{ maxHeight: '160px', maxWidth: '100%', borderRadius: '6px', border: '1px solid #38bdf8' }} />
+                    <button type="button" onClick={() => setBocetoGeneral('')} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}>Quitar Boceto General</button>
+                  </div>
+                ) : (
+                  <div style={{ color: '#64748b', fontSize: '0.85rem', fontStyle: 'italic', padding: '15px' }}>Ningún boceto pegado aún</div>
+                )}
               </div>
 
               {/* DATOS DE PAGO Y ENTREGA */}
@@ -856,12 +858,10 @@ export default function App() {
           </div>
         )}
 
-        {/* NUEVA PESTAÑA: CAJA / CONTABILIDAD (INGRESOS Y EGRESOS) */}
         {vistaActiva === 'caja' && (
           <div style={{ backgroundColor: '#131c2e', padding: '2rem', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <h3 style={{ margin: 0, color: '#4ade80' }}>💰 Control de Caja: Ingresos y Egresos del Taller</h3>
             
-            {/* TARJETAS DE RESUMEN FINANCIERO */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div style={{ backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', textAlign: 'center' }}>
                 <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Total Ingresos</span>
@@ -877,7 +877,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* FORMULARIO PARA REGISTRAR NUEVO GASTO / INGRESO */}
             <form onSubmit={guardarTransaccionCaja} style={{ display: 'flex', gap: '1rem', backgroundColor: '#090d16', padding: '1.2rem', borderRadius: '10px', border: '1px solid #334155', flexWrap: 'wrap', alignItems: 'end' }}>
               <div>
                 <label style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Tipo</label>
@@ -907,7 +906,6 @@ export default function App() {
               <button type="submit" style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', height: '41px' }}>Registrar</button>
             </form>
 
-            {/* TABLA DE MOVIMIENTOS */}
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #334155', color: '#a1a1aa' }}>
